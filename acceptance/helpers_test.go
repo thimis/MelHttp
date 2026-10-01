@@ -24,11 +24,11 @@ import (
 )
 
 var (
-	repoRoot  string
-	binDir    string
-	melcBin   string
-	serverBin string
-	melcBuildErr  error
+	repoRoot       string
+	binDir         string
+	melcBin        string
+	serverBin      string
+	melcBuildErr   error
 	serverBuildErr error
 )
 

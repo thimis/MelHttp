@@ -70,5 +70,6 @@
 *.sh        text eol=lf
 # Byte-exact golden files and binary corpus must never be normalized.
 testdata/**/*.out   binary
+testdata/**/*.in    binary
 testdata/corpus/**  binary
 testdata/fuzz/**    text eol=lf
