@@ -1,0 +1,45 @@
+.stepper {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.step-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 520px;
+  padding-top: 8px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 24px;
+  margin: 8px 0 0;
+}
+
+.summary dt {
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-large);
+}
+
+.summary dd {
+  margin: 0;
+}
+
+.mono {
+  font-family: 'Cascadia Code', Consolas, Menlo, monospace;
+}
+
+.done {
+  color: var(--mat-sys-primary);
+  margin-top: 16px;
+}
