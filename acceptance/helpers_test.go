@@ -28,7 +28,8 @@ var (
 	binDir    string
 	melcBin   string
 	serverBin string
-	buildErr  error
+	melcBuildErr  error
+	serverBuildErr error
 )
 
 func TestMain(m *testing.M) {
@@ -49,10 +50,8 @@ func TestMain(m *testing.M) {
 	}
 	melcBin = filepath.Join(binDir, "melc"+exe)
 	serverBin = filepath.Join(binDir, "melhttpd"+exe)
-	buildErr = goBuild(melcBin, "./cmd/melc")
-	if err := goBuild(serverBin, "./cmd/melhttpd"); err != nil && buildErr == nil {
-		buildErr = err
-	}
+	melcBuildErr = goBuild(melcBin, "./cmd/melc")
+	serverBuildErr = goBuild(serverBin, "./cmd/melhttpd")
 	code := m.Run()
 	os.RemoveAll(binDir)
 	os.Exit(code)
@@ -68,11 +67,19 @@ func goBuild(out, pkg string) error {
 	return nil
 }
 
-// requireBinaries fails the test if the binaries could not be built.
+// requireBinaries fails the test if melc could not be built.
 func requireBinaries(t *testing.T) {
 	t.Helper()
-	if buildErr != nil {
-		t.Fatalf("binaries not built yet: %v", buildErr)
+	if melcBuildErr != nil {
+		t.Fatalf("melc not built: %v", melcBuildErr)
+	}
+}
+
+// requireServer fails the test if melhttpd could not be built.
+func requireServer(t *testing.T) {
+	t.Helper()
+	if serverBuildErr != nil {
+		t.Fatalf("melhttpd not built: %v", serverBuildErr)
 	}
 }
 
@@ -101,7 +108,7 @@ func melcErr(stdin []byte, args ...string) (stdout, stderr []byte, err error) {
 // startServer launches melhttpd on a free loopback port and returns its base URL.
 func startServer(t *testing.T, root string, flags ...string) string {
 	t.Helper()
-	requireBinaries(t)
+	requireServer(t)
 	addr := freeAddr(t)
 	args := append([]string{"-addr", addr, "-root", root}, flags...)
 	ctx, cancel := context.WithCancel(context.Background())
