@@ -361,3 +361,83 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+##
+## ---------------------------------------------------------------------------
+## MelHttp (Go) additions
+## ---------------------------------------------------------------------------
+
+# Secrets & keys — never commit these to the public repo
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.cer
+*.csr
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.kdbx
+id_rsa*
+id_dsa*
+id_ecdsa*
+id_ed25519*
+*.secret
+*.secrets
+secrets/
+certs/
+autocert-cache/
+.netrc
+.npmrc
+credentials*.json
+
+# Claude Code / AI tooling (local only)
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.mcp.json
+
+# Go build output
+/melhttpd
+/melhttpd.exe
+/melc
+/melc.exe
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.prof
+*.pprof
+coverage.*
+*.coverprofile
+dist/
+out/
+/tmp/
+
+# Node / frontend test sites
+node_modules/
+.angular/
+testsites/**/dist/
+testsites/**/build/
+testsites/**/.vite/
+testsites/**/test-results/
+testsites/**/playwright-report/
+.cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Docker
+compose.override.yaml
+docker-compose.override.yml
