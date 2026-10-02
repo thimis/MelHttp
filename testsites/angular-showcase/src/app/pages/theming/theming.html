@@ -1,0 +1,71 @@
+<h1>Theming</h1>
+<p class="page-intro">
+  Material 3 components rendered with system tokens. The two panels below force the light and dark
+  color schemes side by side; the toolbar toggle switches the rest of the app.
+</p>
+
+<section class="overlays" aria-label="Overlays">
+  <h2>Dialogs &amp; snackbars</h2>
+  <div class="row">
+    <button matButton="filled" type="button" (click)="openDialog()">
+      <mat-icon>open_in_new</mat-icon>
+      Open dialog
+    </button>
+    <button matButton="tonal" type="button" (click)="showSnack('info')">Show snackbar</button>
+    <button matButton="outlined" type="button" (click)="showSnack('action')">Snackbar with action</button>
+  </div>
+  <p class="muted" data-testid="dialog-result">Last dialog result: {{ lastResult() }}</p>
+</section>
+
+<section class="schemes" aria-label="Both themes">
+  @for (scheme of schemes; track scheme) {
+    <div [class]="'scheme scheme-' + scheme" [attr.data-scheme]="scheme">
+      <h2>{{ scheme === 'light' ? 'Light' : 'Dark' }} scheme</h2>
+      <div class="row">
+        <button matButton="filled" type="button">Filled</button>
+        <button matButton="tonal" type="button">Tonal</button>
+        <button matButton="outlined" type="button">Outlined</button>
+        <button matButton type="button">Text</button>
+        <button matIconButton type="button" aria-label="Favourite"><mat-icon>favorite</mat-icon></button>
+        <button matMiniFab type="button" aria-label="Add"><mat-icon>add</mat-icon></button>
+      </div>
+      <mat-chip-set aria-label="Opcodes">
+        <mat-chip>jmp</mat-chip>
+        <mat-chip>out</mat-chip>
+        <mat-chip highlighted>crz</mat-chip>
+        <mat-chip disabled>hlt</mat-chip>
+      </mat-chip-set>
+      <mat-card appearance="outlined" class="sample-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar>terminal</mat-icon>
+          <mat-card-title>Card title</mat-card-title>
+          <mat-card-subtitle>Subtitle</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <p>Surface, outline and on-surface tokens adapt to the color scheme.</p>
+          <mat-progress-bar mode="determinate" value="66" aria-label="Progress" />
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <button matButton type="button">Action</button>
+        </mat-card-actions>
+      </mat-card>
+    </div>
+  }
+</section>
+
+<section aria-label="Responsive grid">
+  <h2>Responsive grid</h2>
+  <div class="grid">
+    @for (tile of tiles; track tile.title) {
+      <mat-card appearance="filled" class="tile">
+        <mat-card-header>
+          <mat-icon mat-card-avatar class="tile-icon">{{ tile.icon }}</mat-icon>
+          <mat-card-title>{{ tile.title }}</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <p>{{ tile.body }}</p>
+        </mat-card-content>
+      </mat-card>
+    }
+  </div>
+</section>

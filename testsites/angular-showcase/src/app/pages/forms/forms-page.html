@@ -1,0 +1,122 @@
+<h1>Forms</h1>
+<p class="page-intro">
+  A linear <code>mat-stepper</code> with reactive-form validation, a datepicker, chips, a select, a
+  slide toggle and a custom <code>MatFormFieldControl</code> that only accepts trits (0, 1, 2).
+</p>
+
+<mat-stepper linear #stepper class="stepper" aria-label="Registration">
+  <mat-step [stepControl]="personal" label="Personal info">
+    <form [formGroup]="personal" class="step-form">
+      <mat-form-field appearance="outline">
+        <mat-label>Full name</mat-label>
+        <input matInput formControlName="name" autocomplete="name" required />
+        @if (personal.controls.name.hasError('required')) {
+          <mat-error>Name is required</mat-error>
+        } @else if (personal.controls.name.hasError('minlength')) {
+          <mat-error>Name must be at least 2 characters</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Email</mat-label>
+        <input matInput type="email" formControlName="email" autocomplete="email" required />
+        @if (personal.controls.email.hasError('required')) {
+          <mat-error>Email is required</mat-error>
+        } @else if (personal.controls.email.hasError('email')) {
+          <mat-error>Please enter a valid email address</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Lucky trits</mat-label>
+        <app-trit-input formControlName="trits" placeholder="e.g. 021" [maxLength]="9" />
+        <mat-icon matSuffix aria-hidden="true">memory</mat-icon>
+        <mat-hint>Ternary digits only (0, 1, 2), 3 to 9 of them</mat-hint>
+        @if (personal.controls.trits.hasError('required')) {
+          <mat-error>Trits are required</mat-error>
+        } @else if (personal.controls.trits.hasError('minlength')) {
+          <mat-error>Enter at least 3 trits</mat-error>
+        }
+      </mat-form-field>
+
+      <div class="actions">
+        <button matButton="filled" matStepperNext type="button">Next</button>
+      </div>
+    </form>
+  </mat-step>
+
+  <mat-step [stepControl]="preferences" label="Preferences">
+    <form [formGroup]="preferences" class="step-form">
+      <mat-form-field appearance="outline">
+        <mat-label>Launch date</mat-label>
+        <input matInput [matDatepicker]="picker" [min]="minDate" formControlName="launchDate" />
+        <mat-hint>MM/DD/YYYY</mat-hint>
+        <mat-datepicker-toggle matIconSuffix [for]="picker" />
+        <mat-datepicker #picker />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Tags</mat-label>
+        <mat-chip-grid #chipGrid aria-label="Tags" formControlName="tags">
+          @for (tag of preferences.controls.tags.value; track tag) {
+            <mat-chip-row (removed)="removeTag(tag)">
+              {{ tag }}
+              <button matChipRemove type="button" [attr.aria-label]="'Remove ' + tag">
+                <mat-icon>cancel</mat-icon>
+              </button>
+            </mat-chip-row>
+          }
+          <input
+            placeholder="Add tag…"
+            [matChipInputFor]="chipGrid"
+            [matChipInputSeparatorKeyCodes]="separatorKeys"
+            (matChipInputTokenEnd)="addTag($event)"
+          />
+        </mat-chip-grid>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Favourite framework</mat-label>
+        <mat-select formControlName="framework">
+          @for (f of frameworks; track f.value) {
+            <mat-option [value]="f.value">{{ f.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-slide-toggle formControlName="newsletter">Send me the Malbolge newsletter</mat-slide-toggle>
+
+      <div class="actions">
+        <button matButton matStepperPrevious type="button">Back</button>
+        <button matButton="filled" matStepperNext type="button">Next</button>
+      </div>
+    </form>
+  </mat-step>
+
+  <mat-step label="Review">
+    <dl class="summary" aria-label="Summary">
+      <dt>Name</dt>
+      <dd data-testid="summary-name">{{ personal.controls.name.value || '—' }}</dd>
+      <dt>Email</dt>
+      <dd data-testid="summary-email">{{ personal.controls.email.value || '—' }}</dd>
+      <dt>Trits</dt>
+      <dd class="mono">{{ personal.controls.trits.value || '—' }}</dd>
+      <dt>Launch date</dt>
+      <dd>{{ (preferences.controls.launchDate.value | date: 'longDate') || '—' }}</dd>
+      <dt>Tags</dt>
+      <dd>{{ preferences.controls.tags.value.join(', ') || '—' }}</dd>
+      <dt>Framework</dt>
+      <dd>{{ frameworkLabel(preferences.controls.framework.value) }}</dd>
+      <dt>Newsletter</dt>
+      <dd>{{ preferences.controls.newsletter.value ? 'Yes' : 'No' }}</dd>
+    </dl>
+    @if (submitted()) {
+      <p class="done" role="status">Submitted. Thank you!</p>
+    }
+    <div class="actions">
+      <button matButton matStepperPrevious type="button">Back</button>
+      <button matButton="outlined" type="button" (click)="restart()">Start over</button>
+      <button matButton="filled" type="button" (click)="submit()">Submit</button>
+    </div>
+  </mat-step>
+</mat-stepper>

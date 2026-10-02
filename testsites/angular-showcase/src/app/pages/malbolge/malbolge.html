@@ -1,0 +1,100 @@
+<h1>Malbolge corner</h1>
+<p class="page-intro">
+  This site is served by <strong>MelHttp</strong>, a Go web server with a twist: every file is
+  compiled ahead of time into a Malbolge program, and each response is produced by running that
+  program in a Malbolge interpreter. In other words, <em>every byte of this page was printed by a
+  Malbolge program</em>, one <code>out</code> instruction at a time. The headers below show how much
+  work that took.
+</p>
+
+<div class="cards">
+  <mat-card appearance="outlined" class="headers-card" data-testid="headers-card">
+    <mat-card-header>
+      <mat-icon mat-card-avatar>dns</mat-icon>
+      <mat-card-title>Response headers</mat-card-title>
+      <mat-card-subtitle><code>HEAD /</code></mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      @switch (headers().kind) {
+        @case ('loading') {
+          <mat-progress-bar mode="indeterminate" aria-label="Loading headers" />
+        }
+        @case ('error') {
+          <p class="muted">Could not read the response headers.</p>
+        }
+        @case ('ok') {
+          @let h = headers();
+          @if (h.kind === 'ok') {
+            <dl class="headers">
+              @for (row of h.rows; track row.name) {
+                <dt class="mono">{{ row.name }}</dt>
+                <dd [attr.data-header]="row.name">
+                  @if (row.value !== null) {
+                    <span class="mono">{{ row.value }}</span>
+                  } @else {
+                    <span class="muted">not present</span>
+                  }
+                </dd>
+              }
+            </dl>
+            @if (h.rows[0].value === null) {
+              <p class="muted small">
+                No <code>X-Malbolge-Steps</code> header — this copy is probably served by a regular
+                static server rather than melhttpd.
+              </p>
+            }
+          }
+        }
+      }
+    </mat-card-content>
+  </mat-card>
+</div>
+
+<section class="viewer" aria-label="Source viewer">
+  <h2>Source viewer</h2>
+  <p class="muted">
+    Pick one of the files this page loaded to fetch its original bytes from
+    <code>/_source/&lt;path&gt;</code>.
+  </p>
+  <div class="viewer-controls">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="file-select">
+      <mat-label>File</mat-label>
+      <mat-select [value]="selected()" (valueChange)="onSelect($event)">
+        @for (opt of options(); track opt.path) {
+          <mat-option [value]="opt.path">{{ opt.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <button matButton="filled" type="button" (click)="reload()">
+      <mat-icon>download</mat-icon>
+      Fetch source
+    </button>
+  </div>
+
+  @let s = source();
+  @switch (s.kind) {
+    @case ('idle') {
+      <p class="muted">Nothing fetched yet.</p>
+    }
+    @case ('loading') {
+      <mat-progress-bar mode="indeterminate" aria-label="Loading source" />
+    }
+    @case ('unavailable') {
+      <p class="notice" role="status" data-testid="source-unavailable">
+        <mat-icon aria-hidden="true">info</mat-icon>
+        Source endpoint not available (start melhttpd with <code>-expose-source</code>).
+      </p>
+    }
+    @case ('ok') {
+      @if (s.kind === 'ok') {
+        <p class="meta" data-testid="source-meta">
+          <code>{{ s.path }}</code> — {{ s.length | number }} characters total
+          @if (s.truncated) {
+            (showing first {{ s.preview.length | number }})
+          }
+        </p>
+        <pre class="source" data-testid="source-pre" tabindex="0">{{ s.preview }}</pre>
+      }
+    }
+  }
+</section>
