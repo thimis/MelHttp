@@ -123,7 +123,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 	}
 	plainServer := newServer(plain)
 	servers := []*http.Server{plainServer}
-	errc := make(chan error, 2)
+	errc := make(chan error, 3)
 	go func() { errc <- plainServer.Serve(ln) }()
 	var tlsAddr net.Addr
 	if tln != nil {
@@ -132,6 +132,19 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 		servers = append(servers, hs)
 		tlsAddr = tln.Addr()
 		go func() { errc <- hs.ServeTLS(tln, "", "") }()
+	}
+	if cfg.MetricsAddr != "" {
+		mln, err := net.Listen("tcp", cfg.MetricsAddr)
+		if err != nil {
+			log.Error("cannot listen", "addr", cfg.MetricsAddr, "error", err)
+			return 1
+		}
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", srv.MetricsHandler(version))
+		ms := newServer(mux)
+		servers = append(servers, ms)
+		go func() { errc <- ms.Serve(mln) }()
+		log.Info("metrics listening", "addr", mln.Addr().String())
 	}
 	attrs := []any{"version", version, "addr", ln.Addr().String(), "root", cfg.Server.Root,
 		"spa", srv.SPA(), "cache", !cfg.Server.NoCache}

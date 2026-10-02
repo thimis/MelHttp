@@ -30,6 +30,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				http.Error(rec, "internal server error", http.StatusInternalServerError)
 			}
 		}
+		s.metrics.observe(rec.status, time.Since(start))
 		s.cfg.Logger.Info("request", "method", r.Method, "path", r.URL.Path, "status", rec.status,
 			"bytes", rec.bytes, "cache", rec.Header().Get("X-Malbolge-Cache"), "dur", time.Since(start))
 	}()
@@ -143,8 +144,10 @@ func (s *Server) write(w http.ResponseWriter, r *http.Request, e *entry, res *re
 	}
 	if hit {
 		h.Set("X-Malbolge-Cache", "hit")
+		s.metrics.hits.Add(1)
 	} else {
 		h.Set("X-Malbolge-Cache", "miss")
+		s.metrics.misses.Add(1)
 	}
 	if status == 0 {
 		status = res.status
@@ -229,6 +232,7 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		s.notFound(w, r)
 		return
 	}
+	s.metrics.failures.Add(1)
 	s.cfg.Logger.Error("program failed", "path", r.URL.Path, "status", status, "error", err)
 	w.Header().Set("Cache-Control", "no-store")
 	http.Error(w, http.StatusText(status), status)

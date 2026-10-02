@@ -51,8 +51,11 @@ func TestServeWarmAndShutdown(t *testing.T) {
 	addrc := make(chan net.Addr, 1)
 	done := make(chan int, 1)
 	var logs syncBuffer
+	mln, _ := net.Listen("tcp", "127.0.0.1:0")
+	metricsAddr := mln.Addr().String()
+	mln.Close()
 	go func() {
-		done <- run(ctx, []string{"-addr", "127.0.0.1:0", "-root", root, "-log-format", "json"}, noenv,
+		done <- run(ctx, []string{"-addr", "127.0.0.1:0", "-root", root, "-log-format", "json", "-metrics-addr", metricsAddr}, noenv,
 			io.Discard, &logs, func(a, _ net.Addr) { addrc <- a })
 	}()
 	var addr net.Addr
@@ -74,6 +77,15 @@ func TestServeWarmAndShutdown(t *testing.T) {
 	}
 	if code := run(context.Background(), []string{"-healthcheck", "-addr", addr.String()}, noenv, io.Discard, io.Discard, nil); code != 0 {
 		t.Fatalf("healthcheck on a running server = %d", code)
+	}
+	mres, err := http.Get("http://" + metricsAddr + "/metrics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mbody, _ := io.ReadAll(mres.Body)
+	mres.Body.Close()
+	if !strings.Contains(string(mbody), "melhttp_requests_total{code=\"2xx\"}") || !strings.Contains(string(mbody), "melhttp_cache_hits_total 1") {
+		t.Errorf("metrics:\n%s", mbody)
 	}
 	cancel()
 	if code := <-done; code != 0 {

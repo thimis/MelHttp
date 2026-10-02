@@ -119,6 +119,7 @@ func (s *Server) produce(ctx context.Context, e *entry, r *http.Request) (*resul
 	}
 	run, err := set.Run(ctx, in, &out, malbolge.Limits{MaxSteps: s.cfg.MaxSteps, MaxOutput: s.cfg.MaxOutput})
 	s.runs.Add(1)
+	s.metrics.vmSteps.Add(run.Steps)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
@@ -314,6 +315,7 @@ func (s *Server) markDynamic(url, version string) {
 func (s *Server) produceWASI(ctx context.Context, e *entry, version string, in io.Reader, out *bytes.Buffer) (*result, error) {
 	err := s.wasi.Run(ctx, e.file, version, s.wasiLoader(e), in, out, s.cfg.MaxOutput)
 	s.runs.Add(1)
+	s.metrics.wasiRuns.Add(1)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if errors.Is(err, wasi.ErrTimeout) {

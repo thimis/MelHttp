@@ -81,6 +81,7 @@ func (s *Server) writeProgram(w http.ResponseWriter, r *http.Request, url string
 	}
 	h := w.Header()
 	h.Set(obfs.ContentTypeHeader, res.header.Get("Content-Type"))
+	s.metrics.encoded.Add(1)
 	h.Set(obfs.EncodingHeader, obfs.Program)
 	h.Set("Content-Type", obfs.MediaType)
 	h.Set("Cache-Control", "no-store")

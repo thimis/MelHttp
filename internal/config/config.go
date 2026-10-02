@@ -19,6 +19,7 @@ import (
 // Config is the complete melhttpd configuration.
 type Config struct {
 	Addr        string
+	MetricsAddr string // private listener for /metrics (empty = off)
 	LogFormat   string // text or json
 	Healthcheck bool   // probe a running server and exit
 	Version     bool
@@ -69,6 +70,7 @@ func Parse(args []string, getenv func(string) string, output io.Writer) (Config,
 	fs.Int64Var(&cacheMB, "cache-mb", 512, "response cache size in MiB")
 	fs.BoolVar(&c.Server.AllowSensitiveHeaders, "allow-sensitive-headers", false, "pass Cookie and Authorization to programs")
 	fs.StringVar(&c.LogFormat, "log-format", "text", "log format: text or json")
+	fs.StringVar(&c.MetricsAddr, "metrics-addr", "", "serve Prometheus metrics at /metrics on this private `address` (e.g. 127.0.0.1:9090)")
 	fs.BoolVar(&c.Healthcheck, "healthcheck", false, "check that a server on -addr is healthy, then exit (for Docker)")
 	fs.BoolVar(&c.Version, "version", false, "print the version and exit")
 	fs.StringVar(&c.TLS.Addr, "tls-addr", ":8443", "HTTPS listen `address` (when HTTPS is enabled)")

@@ -28,10 +28,11 @@ type Server struct {
 	dynMu sync.Mutex
 	dyn   map[string]string // URL → version of programs that read input
 
-	assets http.Handler // /_melhttp/ browser assets, when enabled
-	obfMu  sync.Mutex
-	obf    map[string]*variants // URL+ETag → transport encodings
-	wasi   *wasi.Runner         // WASI handlers, when enabled
+	assets  http.Handler // /_melhttp/ browser assets, when enabled
+	obfMu   sync.Mutex
+	obf     map[string]*variants // URL+ETag → transport encodings
+	metrics metrics
+	wasi    *wasi.Runner // WASI handlers, when enabled
 }
 
 // New opens the site at cfg.Root.

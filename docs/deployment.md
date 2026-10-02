@@ -31,6 +31,7 @@ environment.
 | `-wasi` | `MELHTTP_WASI` | false | run `*.wasi` WebAssembly handlers ([wasi.md](wasi.md)) |
 | `-wasi-memory-mb` | `MELHTTP_WASI_MEMORY_MB` | 64 | memory per WASI run |
 | `-hsts` | `MELHTTP_HSTS` | 0 | HSTS max-age on HTTPS responses |
+| `-metrics-addr` | `MELHTTP_METRICS_ADDR` | off | Prometheus metrics at `/metrics` on a **private** address, e.g. `127.0.0.1:9090` |
 | `-healthcheck` | — | | probe `-addr` and exit 0/1 (for container health checks) |
 
 `GET /healthz` returns `200 ok`.
