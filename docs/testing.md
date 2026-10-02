@@ -26,6 +26,7 @@ the complete product.
 | G9 | Every OS/arch builds; the VM and generator compile to WebAssembly. |
 | G10 | The React and Vue sites convert with `--preset auto` and pass crawls, deep links and Playwright. |
 | G11 | The repository is safe to publish: no secrets or local tool files are tracked, and README links resolve. |
+| G12 | HTTPS with automatic certificates: melhttpd gets a real certificate from Pebble, Let's Encrypt's ACME test CA (Docker), serves the site with it, refuses unlisted names, and redirects HTTP. |
 
 ## Layers of assurance for the converter
 

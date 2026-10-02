@@ -23,6 +23,30 @@ type Config struct {
 	Healthcheck bool   // probe a running server and exit
 	Version     bool
 	Server      server.Config
+	TLS         TLS
+}
+
+// TLS configures HTTPS. HTTPS is enabled by -tls-cert/-tls-key, -tls-self-signed
+// or -acme-domains; the plain HTTP listener on -addr then redirects to HTTPS
+// (and answers ACME challenges and /healthz).
+type TLS struct {
+	Addr        string   // HTTPS listen address
+	CertFile    string   // PEM certificate (chain)
+	KeyFile     string   // PEM private key
+	SelfSigned  bool     // generate a throwaway certificate (development)
+	ACMEDomains []string // automatic certificates for these names
+	ACMEEmail   string
+	ACMECache   string
+	ACMEDir     string // ACME directory URL (default: Let's Encrypt)
+	ACMECARoot  string // extra CA roots (PEM) to trust for the ACME directory
+	Redirect    bool   // redirect plain HTTP to HTTPS
+	PublicPort  string // HTTPS port used in redirects (default: the -tls-addr port)
+	MinVersion  string // "1.2" or "1.3"
+}
+
+// Enabled reports whether HTTPS is configured.
+func (t TLS) Enabled() bool {
+	return t.CertFile != "" || t.KeyFile != "" || t.SelfSigned || len(t.ACMEDomains) > 0
 }
 
 // Parse reads flags from args and environment variables via getenv.
@@ -47,6 +71,27 @@ func Parse(args []string, getenv func(string) string, output io.Writer) (Config,
 	fs.StringVar(&c.LogFormat, "log-format", "text", "log format: text or json")
 	fs.BoolVar(&c.Healthcheck, "healthcheck", false, "check that a server on -addr is healthy, then exit (for Docker)")
 	fs.BoolVar(&c.Version, "version", false, "print the version and exit")
+	fs.StringVar(&c.TLS.Addr, "tls-addr", ":8443", "HTTPS listen `address` (when HTTPS is enabled)")
+	fs.StringVar(&c.TLS.CertFile, "tls-cert", "", "TLS certificate `file` (PEM; reloaded when it changes)")
+	fs.StringVar(&c.TLS.KeyFile, "tls-key", "", "TLS private key `file` (PEM)")
+	fs.BoolVar(&c.TLS.SelfSigned, "tls-self-signed", false, "serve HTTPS with a throwaway self-signed certificate (development only)")
+	fs.Func("acme-domains", "comma-separated `names` to get Let's Encrypt certificates for", func(v string) error {
+		c.TLS.ACMEDomains = nil
+		for _, d := range strings.Split(v, ",") {
+			if d = strings.TrimSpace(d); d != "" {
+				c.TLS.ACMEDomains = append(c.TLS.ACMEDomains, d)
+			}
+		}
+		return nil
+	})
+	fs.StringVar(&c.TLS.ACMEEmail, "acme-email", "", "contact `email` for the certificate authority")
+	fs.StringVar(&c.TLS.ACMECache, "acme-cache", "autocert-cache", "`directory` to keep ACME certificates and account keys in")
+	fs.StringVar(&c.TLS.ACMEDir, "acme-directory", "", "ACME directory `URL` (default: Let's Encrypt production)")
+	fs.StringVar(&c.TLS.ACMECARoot, "acme-ca-root", "", "PEM `file` of extra roots to trust for the ACME directory (private CAs, testing)")
+	fs.BoolVar(&c.TLS.Redirect, "https-redirect", true, "redirect plain HTTP requests to HTTPS when HTTPS is enabled")
+	fs.StringVar(&c.TLS.PublicPort, "https-port", "", "public HTTPS `port` for redirects (default: the -tls-addr port; 443 is omitted)")
+	fs.StringVar(&c.TLS.MinVersion, "tls-min", "1.2", "minimum TLS `version`: 1.2 or 1.3")
+	fs.DurationVar(&c.Server.HSTS, "hsts", 0, "send Strict-Transport-Security with this max-age on HTTPS (e.g. 8760h; 0 = off)")
 
 	set := map[string]bool{}
 	if err := fs.Parse(args); err != nil {
@@ -75,6 +120,9 @@ func Parse(args []string, getenv func(string) string, output io.Writer) (Config,
 		return c, fmt.Errorf("-log-format must be text or json, not %q", c.LogFormat)
 	}
 	c.Server.CacheBytes = cacheMB << 20
+	if err := c.TLS.validate(); err != nil {
+		return c, err
+	}
 	return c, nil
 }
 
@@ -89,4 +137,41 @@ func (c Config) HealthcheckURL() string {
 		host = "127.0.0.1"
 	}
 	return "http://" + net.JoinHostPort(host, port) + "/healthz"
+}
+
+func (t TLS) validate() error {
+	sources := 0
+	if t.CertFile != "" || t.KeyFile != "" {
+		if t.CertFile == "" || t.KeyFile == "" {
+			return errors.New("-tls-cert and -tls-key must be given together")
+		}
+		sources++
+	}
+	if t.SelfSigned {
+		sources++
+	}
+	if len(t.ACMEDomains) > 0 {
+		sources++
+	}
+	if sources > 1 {
+		return errors.New("choose one of -tls-cert/-tls-key, -tls-self-signed or -acme-domains")
+	}
+	if t.MinVersion != "1.2" && t.MinVersion != "1.3" {
+		return fmt.Errorf("-tls-min must be 1.2 or 1.3, not %q", t.MinVersion)
+	}
+	return nil
+}
+
+// RedirectPort is the HTTPS port to put in redirect URLs ("" for 443).
+func (t TLS) RedirectPort() string {
+	port := t.PublicPort
+	if port == "" {
+		if _, p, err := net.SplitHostPort(t.Addr); err == nil {
+			port = p
+		}
+	}
+	if port == "443" {
+		return ""
+	}
+	return port
 }

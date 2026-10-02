@@ -7,8 +7,11 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -594,3 +597,99 @@ func npxCmd() string {
 }
 
 func isWindows() bool { return os.PathSeparator == '\\' }
+
+// ---------------------------------------------------------------------------
+// G12 — HTTPS with automatic certificates: melhttpd gets a certificate from a
+// real ACME CA (Pebble, Let's Encrypt's test server, in Docker) and serves it.
+// ---------------------------------------------------------------------------
+
+func TestG12_ACMECertificates(t *testing.T) {
+	if os.Getenv("MELHTTP_DOCKER") != "1" {
+		t.Skip("set MELHTTP_DOCKER=1 to run the ACME goal (starts the Pebble test CA in Docker)")
+	}
+	requireBinaries(t)
+	tmp := t.TempDir()
+	id := strings.TrimSpace(run(t, repoRoot, 5*time.Minute, "docker", "run", "-d", "--rm",
+		"-e", "PEBBLE_VA_ALWAYS_VALID=1", "-e", "PEBBLE_VA_NOSLEEP=1",
+		"-p", "127.0.0.1:14000:14000", "-p", "127.0.0.1:15000:15000", // Pebble advertises URLs on these ports
+		"ghcr.io/letsencrypt/pebble:2.7.0", "-config", "test/config/pebble-config.json"))
+	t.Cleanup(func() { exec.Command("docker", "rm", "-f", id).Run() })
+	port := func(p string) string {
+		out := strings.TrimSpace(run(t, repoRoot, time.Minute, "docker", "port", id, p))
+		return out[strings.LastIndex(out, ":")+1:]
+	}
+	acmePort, mgmtPort := port("14000"), port("15000")
+	minica := filepath.Join(tmp, "minica.pem")
+	run(t, repoRoot, time.Minute, "docker", "cp", id+":/test/certs/pebble.minica.pem", minica)
+	minicaPEM, _ := os.ReadFile(minica)
+	trustMinica := x509.NewCertPool()
+	trustMinica.AppendCertsFromPEM(minicaPEM)
+	mgmt := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: trustMinica}}, Timeout: 10 * time.Second}
+
+	// The root that Pebble signs issued certificates with.
+	var rootPEM []byte
+	for i := 0; i < 60 && rootPEM == nil; i++ {
+		if resp, err := mgmt.Get("https://localhost:" + mgmtPort + "/roots/0"); err == nil {
+			if resp.StatusCode == 200 {
+				rootPEM, _ = io.ReadAll(resp.Body)
+			}
+			resp.Body.Close()
+		}
+		if rootPEM == nil {
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+	if rootPEM == nil {
+		t.Fatal("Pebble did not come up")
+	}
+
+	src, site := t.TempDir(), t.TempDir()
+	page := []byte("<h1>Malbolge over a real ACME certificate</h1>")
+	melc(t, nil, "gen", "-o", filepath.Join(site, "index.html.mb"), writeFile(t, src, "index.html", page))
+	tlsAddr := freeAddr(t)
+	cache := filepath.Join(tmp, "autocert-cache")
+	base := startServer(t, site, "-tls-addr", tlsAddr, "-acme-domains", "melhttp.test",
+		"-acme-directory", "https://localhost:"+acmePort+"/dir", "-acme-ca-root", minica, "-acme-cache", cache)
+
+	pool := x509.NewCertPool()
+	pool.AppendCertsFromPEM(rootPEM)
+	client := &http.Client{Timeout: 90 * time.Second, Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{RootCAs: pool, ServerName: "melhttp.test"},
+		DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, tlsAddr)
+		},
+	}}
+	resp, err := client.Get("https://melhttp.test/")
+	if err != nil {
+		t.Fatalf("HTTPS with an ACME certificate: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !bytes.Equal(body, page) {
+		t.Fatalf("body %q", body)
+	}
+	leaf := resp.TLS.PeerCertificates[0]
+	t.Logf("certificate for %v issued by %q", leaf.DNSNames, leaf.Issuer.CommonName)
+	if !strings.Contains(strings.ToLower(leaf.Issuer.CommonName), "pebble") || leaf.DNSNames[0] != "melhttp.test" {
+		t.Errorf("unexpected certificate: %v from %v", leaf.DNSNames, leaf.Issuer)
+	}
+	if entries, _ := os.ReadDir(cache); len(entries) == 0 {
+		t.Error("the certificate was not cached")
+	}
+	// Unlisted names get no certificate.
+	bad := client.Transport.(*http.Transport).Clone()
+	bad.TLSClientConfig.ServerName = "evil.test"
+	if _, err := (&http.Client{Transport: bad, Timeout: 20 * time.Second}).Get("https://evil.test/"); err == nil {
+		t.Error("served a certificate for an unlisted domain")
+	}
+	// Plain HTTP redirects to HTTPS.
+	noFollow := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	r, err := noFollow.Get(base + "/x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Body.Close()
+	if r.StatusCode != http.StatusPermanentRedirect || !strings.HasPrefix(r.Header.Get("Location"), "https://") {
+		t.Errorf("HTTP redirect: %d %q", r.StatusCode, r.Header.Get("Location"))
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"strings"
@@ -296,7 +297,7 @@ func TestFromHTTP(t *testing.T) {
 				return r
 			},
 			want: Request{Method: "GET", Protocol: "HTTP/1.1", ScriptName: "/echo.txt", PathInfo: "/extra",
-				ServerName: "example.com", ServerPort: "443", RemoteAddr: "10.0.0.1"},
+				ServerName: "example.com", ServerPort: "443", RemoteAddr: "10.0.0.1", HTTPS: true},
 			hdr: http.Header{},
 		},
 		{
@@ -462,5 +463,22 @@ func TestInputNilBody(t *testing.T) {
 	got, err := io.ReadAll(Input(meta, nil))
 	if err != nil || string(got) != "A=1\n\n" {
 		t.Fatalf("got %q %v", got, err)
+	}
+}
+
+func TestMetaHTTPS(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "https://example.com/x", nil)
+	r.TLS = &tls.ConnectionState{}
+	req := FromHTTP(r, "/x", "", Options{})
+	if !req.HTTPS || req.ServerPort != "443" {
+		t.Fatalf("HTTPS=%v port=%s", req.HTTPS, req.ServerPort)
+	}
+	meta := string(req.Meta(Options{}))
+	if !strings.Contains(meta, "REMOTE_ADDR=192.0.2.1\nHTTPS=on\nREQUEST_SCHEME=https\n") {
+		t.Fatalf("meta:\n%s", meta)
+	}
+	plain := string(FromHTTP(httptest.NewRequest(http.MethodGet, "/x", nil), "/x", "", Options{}).Meta(Options{}))
+	if strings.Contains(plain, "HTTPS") || strings.Contains(plain, "REQUEST_SCHEME") {
+		t.Fatalf("plain HTTP meta mentions HTTPS:\n%s", plain)
 	}
 }

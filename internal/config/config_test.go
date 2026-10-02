@@ -66,3 +66,32 @@ func TestHealthcheckURL(t *testing.T) {
 		}
 	}
 }
+
+func TestTLSFlags(t *testing.T) {
+	c, err := Parse([]string{"-acme-domains", "a.test, b.test", "-hsts", "8760h", "-https-port", "443"},
+		env(map[string]string{"MELHTTP_ACME_EMAIL": "me@example.com", "MELHTTP_TLS_ADDR": ":9443"}), io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.TLS.Enabled() || len(c.TLS.ACMEDomains) != 2 || c.TLS.ACMEDomains[1] != "b.test" || c.TLS.ACMEEmail != "me@example.com" ||
+		c.TLS.Addr != ":9443" || c.Server.HSTS != 8760*time.Hour || !c.TLS.Redirect || c.TLS.ACMECache != "autocert-cache" {
+		t.Fatalf("tls config: %+v hsts %v", c.TLS, c.Server.HSTS)
+	}
+	if c.TLS.RedirectPort() != "" {
+		t.Errorf("443 should be omitted from redirects, got %q", c.TLS.RedirectPort())
+	}
+	plain, _ := Parse(nil, env(nil), io.Discard)
+	if plain.TLS.Enabled() || plain.TLS.RedirectPort() != "8443" {
+		t.Errorf("default TLS: enabled=%v port=%q", plain.TLS.Enabled(), plain.TLS.RedirectPort())
+	}
+	for _, args := range [][]string{
+		{"-tls-cert", "c.pem"},
+		{"-tls-cert", "c.pem", "-tls-key", "k.pem", "-tls-self-signed"},
+		{"-tls-self-signed", "-acme-domains", "a.test"},
+		{"-tls-self-signed", "-tls-min", "1.1"},
+	} {
+		if _, err := Parse(args, env(nil), io.Discard); err == nil {
+			t.Errorf("accepted %v", args)
+		}
+	}
+}

@@ -58,3 +58,21 @@ services:
     working_dir: /work
     volumes: ["./:/work"]
     user: "${UID:-1000}:${GID:-1000}"
+
+  # Public HTTPS with automatic Let's Encrypt certificates. Point DNS for your
+  # domain at this host, make ports 80 and 443 reachable, then:
+  #   MELHTTP_DOMAIN=example.com MELHTTP_EMAIL=you@example.com docker compose --profile https up -d
+  https:
+    <<: *melhttp
+    profiles: ["https"]
+    environment:
+      MELHTTP_ROOT: /srv/sites/angular
+      MELHTTP_ACME_DOMAINS: ${MELHTTP_DOMAIN:-}  # required for this profile
+      MELHTTP_ACME_EMAIL: ${MELHTTP_EMAIL:-}
+      MELHTTP_HTTPS_PORT: "443"
+      MELHTTP_HSTS: 8760h
+    ports: ["80:8080", "443:8443"]
+    volumes: ["melhttp-certs:/var/lib/melhttp/certs"]
+
+volumes:
+  melhttp-certs:

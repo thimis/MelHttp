@@ -70,6 +70,15 @@ Every response gets `X-Content-Type-Options: nosniff`,
 Sites can add more, such as a full CSP or HSTS, with `headers` in
 `melhttp.json`.
 
+## HTTPS
+
+- **Versions:** TLS 1.2 minimum (`-tls-min 1.3` for 1.3 only), and HTTP/2.
+- **Certificates:** automatic ACME certificates are restricted to the configured `-acme-domains`;
+  unknown SNI names get no certificate. Certificate files reload on change, and a
+  half-written renewal keeps the old certificate.
+- **Redirects and HSTS:** plain HTTP redirects to HTTPS (`308`); optional HSTS. The ACME cache
+  holds private keys: keep it on a private, persistent volume (directory mode 0700).
+
 ## HTTP server
 
 - **Timeouts:** read-header 10 s, read 60 s, write = program timeout + 60 s,

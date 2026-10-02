@@ -30,7 +30,8 @@ type Config struct {
 	// Revalidate is how often a cached entry re-checks its files on disk
 	// (default 1s; negative means on every request).
 	Revalidate            time.Duration
-	AllowSensitiveHeaders bool // pass Cookie/Authorization to programs
+	AllowSensitiveHeaders bool          // pass Cookie/Authorization to programs
+	HSTS                  time.Duration // Strict-Transport-Security max-age on HTTPS responses (0 = off)
 	Logger                *slog.Logger
 }
 

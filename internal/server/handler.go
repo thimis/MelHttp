@@ -36,6 +36,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 	h.Set("X-Frame-Options", "SAMEORIGIN")
 	h.Set("Content-Security-Policy", "frame-ancestors 'self'")
+	if r.TLS != nil && s.cfg.HSTS > 0 {
+		h.Set("Strict-Transport-Security", "max-age="+strconv.FormatInt(int64(s.cfg.HSTS.Seconds()), 10))
+	}
 	for k, v := range s.site.Headers {
 		h.Set(k, v)
 	}

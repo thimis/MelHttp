@@ -53,7 +53,7 @@ func TestServeWarmAndShutdown(t *testing.T) {
 	var logs syncBuffer
 	go func() {
 		done <- run(ctx, []string{"-addr", "127.0.0.1:0", "-root", root, "-log-format", "json"}, noenv,
-			io.Discard, &logs, func(a net.Addr) { addrc <- a })
+			io.Discard, &logs, func(a, _ net.Addr) { addrc <- a })
 	}()
 	var addr net.Addr
 	select {

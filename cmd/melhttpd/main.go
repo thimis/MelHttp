@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
@@ -15,11 +16,15 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/thimis/MelHttp/internal/config"
 	"github.com/thimis/MelHttp/internal/server"
+	"github.com/thimis/MelHttp/internal/tlsutil"
+	"golang.org/x/crypto/acme"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
@@ -33,8 +38,8 @@ func main() {
 }
 
 // run is main without process globals. If ready is non-nil it receives the
-// listening address once the server accepts connections.
-func run(ctx context.Context, args []string, getenv func(string) string, stdout, stderr io.Writer, ready func(net.Addr)) int {
+// listening addresses (https is nil without HTTPS) once they accept connections.
+func run(ctx context.Context, args []string, getenv func(string) string, stdout, stderr io.Writer, ready func(http, https net.Addr)) int {
 	cfg, err := config.Parse(args, getenv, stderr)
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -70,27 +75,72 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 			"failed", st.Failed, "steps", st.Steps, "bytes", st.Bytes, "duration", st.Duration.Round(time.Millisecond))
 	}
 
+	tlsConfig, acmeMgr, err := setupTLS(cfg.TLS, log)
+	if err != nil {
+		log.Error("tls", "error", err)
+		return 1
+	}
+	newServer := func(h http.Handler) *http.Server {
+		return &http.Server{
+			Handler:           h,
+			ReadHeaderTimeout: 10 * time.Second,
+			ReadTimeout:       60 * time.Second,
+			WriteTimeout:      cfg.Server.Timeout + 60*time.Second, // longer than any program run
+			IdleTimeout:       120 * time.Second,
+			MaxHeaderBytes:    64 << 10,
+			ErrorLog:          slog.NewLogLogger(handler, slog.LevelWarn),
+		}
+	}
+
+	var tln net.Listener
+	if tlsConfig != nil {
+		if tln, err = net.Listen("tcp", cfg.TLS.Addr); err != nil {
+			log.Error("cannot listen", "addr", cfg.TLS.Addr, "error", err)
+			return 1
+		}
+	}
+	// Plain HTTP: the site itself, or (with HTTPS) a redirector that still
+	// answers health checks and ACME HTTP-01 challenges.
+	var plain http.Handler = srv
+	if tlsConfig != nil && cfg.TLS.Redirect {
+		port := cfg.TLS.RedirectPort()
+		if cfg.TLS.PublicPort == "" {
+			// The real port, in case -tls-addr asked for any free port.
+			port = config.TLS{Addr: tln.Addr().String()}.RedirectPort()
+		}
+		plain = redirectToHTTPS(srv, port)
+	}
+	if acmeMgr != nil {
+		plain = acmeMgr.HTTPHandler(plain)
+	}
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
+		if tln != nil {
+			tln.Close()
+		}
 		log.Error("cannot listen", "addr", cfg.Addr, "error", err)
 		return 1
 	}
-	hs := &http.Server{
-		Handler:           srv,
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       60 * time.Second,
-		WriteTimeout:      cfg.Server.Timeout + 60*time.Second, // longer than any program run
-		IdleTimeout:       120 * time.Second,
-		MaxHeaderBytes:    64 << 10,
-		ErrorLog:          slog.NewLogLogger(handler, slog.LevelWarn),
+	servers := []*http.Server{newServer(plain)}
+	errc := make(chan error, 2)
+	go func() { errc <- servers[0].Serve(ln) }()
+	var tlsAddr net.Addr
+	if tln != nil {
+		hs := newServer(srv)
+		hs.TLSConfig = tlsConfig // ServeTLS adds HTTP/2
+		servers = append(servers, hs)
+		tlsAddr = tln.Addr()
+		go func() { errc <- hs.ServeTLS(tln, "", "") }()
 	}
-	log.Info("melhttpd listening", "version", version, "addr", ln.Addr().String(), "root", cfg.Server.Root,
-		"spa", srv.SPA(), "cache", !cfg.Server.NoCache)
+	attrs := []any{"version", version, "addr", ln.Addr().String(), "root", cfg.Server.Root,
+		"spa", srv.SPA(), "cache", !cfg.Server.NoCache}
+	if tlsAddr != nil {
+		attrs = append(attrs, "https", tlsAddr.String())
+	}
+	log.Info("melhttpd listening", attrs...)
 	if ready != nil {
-		ready(ln.Addr())
+		ready(ln.Addr(), tlsAddr)
 	}
-	errc := make(chan error, 1)
-	go func() { errc <- hs.Serve(ln) }()
 	select {
 	case err := <-errc:
 		log.Error("server stopped", "error", err)
@@ -100,11 +150,85 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 	log.Info("shutting down")
 	sctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	if err := hs.Shutdown(sctx); err != nil {
-		log.Error("shutdown", "error", err)
-		return 1
+	code := 0
+	for _, hs := range servers {
+		if err := hs.Shutdown(sctx); err != nil {
+			log.Error("shutdown", "error", err)
+			code = 1
+		}
 	}
-	return 0
+	return code
+}
+
+// setupTLS builds the TLS configuration for whichever HTTPS mode is enabled.
+func setupTLS(c config.TLS, log *slog.Logger) (*tls.Config, *autocert.Manager, error) {
+	if !c.Enabled() {
+		return nil, nil, nil
+	}
+	minVersion, err := tlsutil.MinVersion(c.MinVersion)
+	if err != nil {
+		return nil, nil, err
+	}
+	switch {
+	case c.CertFile != "":
+		r, err := tlsutil.NewReloader(c.CertFile, c.KeyFile, 10*time.Second)
+		if err != nil {
+			return nil, nil, err
+		}
+		return &tls.Config{GetCertificate: r.GetCertificate, MinVersion: minVersion}, nil, nil
+	case c.SelfSigned:
+		hosts := []string{"localhost", "127.0.0.1", "::1"}
+		if h, err := os.Hostname(); err == nil && h != "" {
+			hosts = append(hosts, h)
+		}
+		cert, _, _, err := tlsutil.SelfSigned(hosts, 30*24*time.Hour)
+		if err != nil {
+			return nil, nil, err
+		}
+		log.Warn("serving HTTPS with a self-signed certificate; browsers will warn (development only)")
+		return &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: minVersion}, nil, nil
+	}
+	m, err := tlsutil.NewACME(tlsutil.ACMEConfig{
+		Domains: c.ACMEDomains, Email: c.ACMEEmail, CacheDir: c.ACMECache, Directory: c.ACMEDir, CARoot: c.ACMECARoot,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	directory := c.ACMEDir
+	if directory == "" {
+		directory = acme.LetsEncryptURL
+	}
+	log.Info("automatic certificates via ACME (accepting the CA's terms of service)",
+		"domains", strings.Join(c.ACMEDomains, ","), "directory", directory, "cache", c.ACMECache)
+	tc := m.TLSConfig()
+	tc.MinVersion = minVersion
+	return tc, m, nil
+}
+
+// redirectToHTTPS sends every request except health checks to HTTPS with a
+// permanent, method-preserving redirect.
+func redirectToHTTPS(site http.Handler, port string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/healthz" {
+			site.ServeHTTP(w, r)
+			return
+		}
+		host := r.Host
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
+		if host == "" || strings.ContainsAny(host, "/\\@") {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		if strings.Contains(host, ":") {
+			host = "[" + host + "]" // IPv6 literal
+		}
+		if port != "" {
+			host += ":" + port
+		}
+		http.Redirect(w, r, "https://"+host+r.URL.RequestURI(), http.StatusPermanentRedirect)
+	})
 }
 
 // healthcheck probes a running server, for container health checks (the

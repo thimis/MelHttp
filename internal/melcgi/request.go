@@ -21,6 +21,7 @@ type Request struct {
 	ServerName string // SERVER_NAME: host part of the Host header
 	ServerPort string // SERVER_PORT
 	RemoteAddr string // REMOTE_ADDR: client IP, without port
+	HTTPS      bool   // HTTPS=on and REQUEST_SCHEME=https, omitted for plain HTTP
 
 	ContentType   string // CONTENT_TYPE, omitted when empty
 	ContentLength int64  // CONTENT_LENGTH, omitted unless > 0
@@ -90,6 +91,7 @@ func FromHTTP(r *http.Request, scriptName, pathInfo string, opt Options) Request
 		ServerName:    name,
 		ServerPort:    port,
 		RemoteAddr:    remote,
+		HTTPS:         r.TLS != nil,
 		ContentType:   r.Header.Get("Content-Type"),
 		ContentLength: r.ContentLength,
 		Header:        filterHeader(r.Header, opt),
@@ -170,6 +172,10 @@ func (r Request) Meta(opt Options) []byte {
 	put("SERVER_NAME", r.ServerName)
 	put("SERVER_PORT", r.ServerPort)
 	put("REMOTE_ADDR", r.RemoteAddr)
+	if r.HTTPS {
+		put("HTTPS", "on")
+		put("REQUEST_SCHEME", "https")
+	}
 	if r.ContentType != "" {
 		put("CONTENT_TYPE", r.ContentType)
 	}

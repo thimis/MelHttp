@@ -17,7 +17,7 @@ It serves real sites: the repository includes an Angular Material app, React and
 Download the archive for your OS and CPU (Linux, Windows, macOS or FreeBSD; amd64 or arm64), unpack it, and put `melhttpd` and `melc` on your `PATH`.
 
 ### Option B: from source
-Requires [Go 1.24+](https://go.dev/dl/) (`winget install GoLang.Go`, `brew install go`, or your package manager).
+Requires [Go 1.26+](https://go.dev/dl/) (`winget install GoLang.Go`, `brew install go`, or your package manager).
 
 ```bash
 git clone https://github.com/thimis/MelHttp.git && cd MelHttp
@@ -60,8 +60,9 @@ Useful `melhttpd` flags (each can also be set with a `MELHTTP_*` environment var
 | `-no-cache` | off | run the VM on every request |
 | `-max-steps`, `-timeout`, `-max-body` | 2e9, 30s, 1 MiB | per-request limits |
 | `-healthcheck` | | exit 0 if a server on `-addr` is healthy (for Docker) |
+| `-acme-domains`, `-tls-cert`/`-tls-key`, `-tls-self-signed` | off | enable HTTPS on `-tls-addr` (`:8443`) |
 
-All flags, plus systemd, launchd and Windows setup: [docs/deployment.md](docs/deployment.md). HTTPS is next on the [roadmap](docs/roadmap.md); until then, use a TLS proxy.
+All flags, plus systemd, launchd and Windows setup: [docs/deployment.md](docs/deployment.md). **HTTPS:** `-acme-domains example.com` gets free, automatically renewed Let's Encrypt certificates (ports 80 and 443 must reach the server), `-tls-cert`/`-tls-key` serves your own, and `-tls-self-signed` is for local testing. Plain HTTP then redirects to HTTPS, and `-hsts 8760h` adds HSTS. Details: [docs/deployment.md#https](docs/deployment.md#https).
 
 ## Compiling `.mb` files
 

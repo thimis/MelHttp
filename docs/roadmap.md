@@ -8,20 +8,11 @@
 - `melhttpd`: caching, warm-up, gzip, conditional requests, SPA fallback, hot reload, limits
 - `melc build` with framework presets (Angular, Vite/React/Vue/Svelte, CRA, Next, Nuxt, Astro, Gatsby, Hugo, Jekyll)
 - Docker image and compose demo, release archives for 8 platforms, CI on Linux/Windows/macOS
+- HTTPS: automatic Let's Encrypt certificates (ACME), certificate files with hot reload,
+  self-signed development mode, HTTP→HTTPS redirect, HSTS, HTTP/2, TLS 1.2+ (goal G12
+  issues a real certificate from Pebble, the ACME test CA)
 
-## Next: HTTPS
-
-- `-tls-cert` / `-tls-key` (standard library `ListenAndServeTLS`).
-- `-acme-domain example.com` for automatic Let's Encrypt certificates via
-  `golang.org/x/crypto/acme/autocert` (the first non-stdlib dependency):
-  - a certificate cache on a volume;
-  - HTTP-01 challenges on :80, with everything else redirected to HTTPS;
-  - TLS 1.2 minimum, and optional HSTS.
-- HTTP/2 comes for free with TLS in `net/http`.
-- In Docker, keep listening on 8080/8443 as non-root and map the host ports
-  80/443.
-
-## Later: Malbolge traffic obfuscation
+## Next: Malbolge traffic obfuscation
 
 The idea is `Content-Encoding: malbolge`: the server sends response bodies
 *as Malbolge programs*, and the browser executes them to recover the content.

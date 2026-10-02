@@ -69,13 +69,44 @@ go run ./tools/dist            # dist/melhttp_<version>_<os>_<arch>.{tar.gz,zip}
 
 ## HTTPS
 
-Native TLS is the next roadmap item (see [roadmap.md](roadmap.md)). Until
-then, put melhttpd behind a TLS-terminating proxy such as Caddy, nginx or a
-cloud load balancer. For example, Caddy obtains Let's Encrypt certificates
-automatically:
+HTTPS is enabled by exactly one of three certificate sources. The plain HTTP
+listener on `-addr` then answers `/healthz` and ACME challenges, and redirects
+everything else to HTTPS (`308`, path and query kept; turn off with
+`-https-redirect=false`). HTTPS speaks HTTP/2 and accepts TLS 1.2+ (`-tls-min 1.3`
+to require 1.3). `-hsts 8760h` adds `Strict-Transport-Security` to HTTPS responses.
 
+| Mode | Flags |
+|---|---|
+| Automatic Let's Encrypt certificates | `-acme-domains example.com,www.example.com -acme-email you@example.com` |
+| Certificate files (reloaded automatically when renewed) | `-tls-cert fullchain.pem -tls-key privkey.pem` |
+| Throwaway self-signed certificate (development) | `-tls-self-signed` |
+
+| Flag | Env | Default | |
+|---|---|---|---|
+| `-tls-addr` | `MELHTTP_TLS_ADDR` | `:8443` | HTTPS listen address |
+| `-https-port` | `MELHTTP_HTTPS_PORT` | the `-tls-addr` port | public HTTPS port used in redirects (443 is omitted) |
+| `-acme-cache` | `MELHTTP_ACME_CACHE` | `autocert-cache` | where certificates and the account key are kept; **keep it private and persistent** |
+| `-acme-directory` | `MELHTTP_ACME_DIRECTORY` | Let's Encrypt | any RFC 8555 CA (Let's Encrypt staging, ZeroSSL, step-ca, …) |
+| `-acme-ca-root` | `MELHTTP_ACME_CA_ROOT` | | extra root (PEM) to trust for that directory |
+
+**Let's Encrypt requirements.** DNS for every domain must point at the server, and
+ports **80 and 443** must reach melhttpd. HTTP-01 challenges arrive on 80, and
+TLS-ALPN-01 challenges on 443. Certificates are requested on the first HTTPS
+request for a name and renewed automatically. Using `-acme-domains` accepts the
+CA's terms of service.
+
+**Low ports without root.** melhttpd listens on 8080/8443 by default. Map 80/443
+to them (Docker `-p 80:8080 -p 443:8443`, or a firewall redirect), or give the
+binary `CAP_NET_BIND_SERVICE` (see the systemd unit) and use `-addr :80 -tls-addr :443`.
+
+**Docker.**
+
+```bash
+MELHTTP_DOMAIN=example.com MELHTTP_EMAIL=you@example.com docker compose --profile https up -d
 ```
-example.com {
-    reverse_proxy 127.0.0.1:8080
-}
-```
+
+That runs the `https` service: ports 80/443, HSTS, and certificates in the
+`melhttp-certs` volume.
+
+If you prefer a TLS-terminating proxy (Caddy, nginx, a cloud load balancer),
+run melhttpd on plain HTTP behind it as before.
