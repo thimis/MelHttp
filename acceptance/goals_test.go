@@ -570,8 +570,19 @@ func assertDeepLink(t *testing.T, base, dist string, paths ...string) {
 	}
 }
 
+var playwrightOnce sync.Once
+
+// runPlaywright runs a test site's Playwright suite against base. The first
+// call installs Playwright's Chromium if needed (a no-op when it is cached).
 func runPlaywright(t *testing.T, proj, base string) {
 	t.Helper()
+	playwrightOnce.Do(func() {
+		cmd := exec.Command(npxCmd(), "playwright", "install", "chromium")
+		cmd.Dir = proj
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Logf("playwright install chromium: %v\n%s", err, out)
+		}
+	})
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, npxCmd(), "playwright", "test", "--reporter=line")

@@ -29,37 +29,173 @@ Single executables with no dependencies, for **Linux, Windows, macOS and FreeBSD
 | **Docker** | `docker compose up --build -d --wait` starts eight demo sites (ports 8080–8087). After a release: `docker run -p 8080:8080 ghcr.io/thimis/melhttp`. |
 | **From source** (Go 1.26+) | `git clone https://github.com/thimis/MelHttp && cd MelHttp && go generate ./internal/webvm && go build -o bin/ ./cmd/melc ./cmd/melhttpd` |
 
-**Step-by-step guides for every OS:** [docs/install.md](docs/install.md). **Putting a site online** (Linux server, Docker, Windows service, macOS, FreeBSD, reverse proxies, Kubernetes): [docs/hosting.md](docs/hosting.md).
+**Step-by-step guides for every OS:** [docs/install.md](docs/install.md).
 
-## Quick start with the scripts
+## Try it in one minute
 
-From a clone of the repository, two scripts do everything: PowerShell for Windows, bash for Linux, macOS and Git Bash.
+From a clone of the repository, two scripts do the work: PowerShell for Windows, bash for Linux, macOS and Git Bash. They build `melc` and `melhttpd` themselves, so all you need is [Go](https://go.dev/dl/).
 
-| Task | PowerShell | bash |
-|---|---|---|
-| Run the tests (`-Quick` / `--quick`: about 1 min; `-Full` / `--full`: everything, needs Docker) | `.\scripts\test.ps1` | `scripts/test.sh` |
-| Serve a demo site | `.\scripts\serve.ps1 angular -Open` | `scripts/serve.sh angular --open` |
-| Serve your own folder, rebuilding on changes | `.\scripts\serve.ps1 C:\my-site -Watch` | `scripts/serve.sh ~/my-site --watch` |
-| Add self-signed HTTPS and metrics | `... -Https -Metrics` | `... --https --metrics` |
-| All eight demo sites in Docker | `.\scripts\serve.ps1 -Docker` (`-Docker -Stop` to stop) | `scripts/serve.sh --docker` |
-
-Demo sites: `hello`, `classic`, `cgi`, `angular`, `react`, `vue`, `transport` (the Malbolge transport and playground) and `wasi`. Run `Get-Help .\scripts\serve.ps1` or `scripts/serve.sh --help` for all options.
-
-## Usage
-
-```bash
-melc build -o site ./my-site                  # compile a folder of static files to Malbolge
-melhttpd -root site                           # serve it on http://localhost:8080
-melc watch -serve :8080 ./my-site             # or: rebuild and serve on every change
+```powershell
+.\scripts\serve.ps1 classic -Open        # Windows
 ```
 
-For HTTPS, add your domain; ports 80 and 443 must reach the server:
+```bash
+scripts/serve.sh classic --open          # Linux, macOS, Git Bash
+```
+
+That opens a demo site whose every byte came out of the Malbolge VM. Try `curl -I http://localhost:8080/` (`curl.exe` in PowerShell) to see `X-Powered-By: Malbolge` and `X-Malbolge-Steps: …`.
+
+Other demos to try instead of `classic`:
+
+| Demo | What it shows |
+|---|---|
+| `hello` | a single page |
+| `cgi` | programs that read the request |
+| `angular`, `react`, `vue` | real framework apps (need Node.js; built on first use) |
+| `transport` | pages travel as Malbolge programs to the browser; plus the playground |
+| `wasi` | a Go program compiled to WebAssembly |
+
+`.\scripts\serve.ps1 -Docker` (`scripts/serve.sh --docker`) starts all eight demo sites in Docker.
+
+## Build your own app
+
+The PowerShell commands are shown. With bash, use `scripts/serve.sh` and lowercase options with two dashes (`--watch`, `--open`).
+
+### 1. A website from plain files
+
+Make a folder with an `index.html`, plus any CSS, JavaScript, images or fonts, in any sub-folders. Then:
+
+```powershell
+.\scripts\serve.ps1 C:\my-site -Watch -Open
+```
+
+Your site opens at http://localhost:8080. Every time you save a file, it is recompiled to Malbolge and the next refresh shows the change. Stop with **Ctrl+C**.
+
+Without the scripts, using installed binaries:
 
 ```bash
+melc watch -serve :8080 ./my-site     # develop: rebuild and serve on every change
+melc build -o site ./my-site          # or build once...
+melhttpd -root site                   # ...and serve
+```
+
+### 2. A React, Vue, Svelte, Angular… app
+
+Create or use any app that builds to static files (Node.js required):
+
+```bash
+npm create vite@latest my-app -- --template react-ts --no-interactive   # or: vue-ts, svelte-ts, …
+```
+
+Then point the script at the project folder:
+
+```powershell
+.\scripts\serve.ps1 C:\path\to\my-app -Open
+```
+
+MelHttp detects the framework from `package.json`, installs dependencies, runs `npm run build`, compiles the output to Malbolge, and turns on single-page-app routing so deep links like `/settings` work.
+
+- **After changing the app:** add `-Rebuild` to build it again.
+- **Without the script:** `melc build --preset auto --run-build -o site ./my-app`, then `melhttpd -root site`.
+- **Supported frameworks:** Angular, Vite (React, Vue, Svelte, Solid, Preact, Lit), Create React App, Next (static export), Nuxt, Astro, Gatsby, Hugo, Jekyll. → [docs/frameworks.md](docs/frameworks.md)
+
+### 3. Dynamic pages
+
+Compiled files are static. For pages that react to the request, add a **WASI handler**: a small program in any language that compiles to WebAssembly. For example, in Go:
+
+```go
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+	"time"
+)
+
+func main() {
+	vars := map[string]string{}
+	in := bufio.NewScanner(os.Stdin)
+	for in.Scan() && in.Text() != "" { // the request: NAME=value lines, a blank line, then the body
+		k, v, _ := strings.Cut(in.Text(), "=")
+		vars[k] = v
+	}
+	fmt.Print("Content-Type: text/plain\n\n") // the response: headers, a blank line, the body
+	fmt.Printf("Hello %s! It is %s.\n", vars["REMOTE_ADDR"], time.Now().Format(time.Kitchen))
+}
+```
+
+Compile it into your site and serve with `-wasi`:
+
+```bash
+GOOS=wasip1 GOARCH=wasm go build -o my-site/api/hello.txt.wasi .   # PowerShell: $env:GOOS="wasip1"; $env:GOARCH="wasm"; go build …
+melc build -o site my-site && melhttpd -root site -wasi              # http://localhost:8080/api/hello.txt
+```
+
+- **Sandbox:** handlers get no files, network or environment; memory and time are capped. → [docs/wasi.md](docs/wasi.md)
+- **Pure Malbolge:** hand-written programs work too, as `name.ext.mb` (MelCGI headers and body) or `name.ext.raw.mb` (body only). → [docs/melcgi.md](docs/melcgi.md)
+
+### 4. Put it online
+
+Build the site, copy the `site` folder to your server, and start `melhttpd` with your domain for free, automatic HTTPS (ports 80 and 443 must reach the server):
+
+```bash
+melc build -o site ./my-site
 melhttpd -root site -addr :80 -tls-addr :443 -acme-domains example.com -acme-email you@example.com
 ```
 
-Every response from a program carries `X-Powered-By: Malbolge` and `X-Malbolge-Steps: <instructions executed>`.
+Rebuilding into the same `site` folder updates the live site in place, with no restart.
+
+For running it permanently, [docs/hosting.md](docs/hosting.md) walks through:
+
+- a Linux server with systemd;
+- Docker Compose;
+- a Windows service (`melhttpd -service install …`);
+- macOS and FreeBSD;
+- Caddy or nginx in front;
+- Kubernetes.
+
+## Run the tests
+
+```powershell
+.\scripts\test.ps1 -Quick     # Windows        (scripts/test.sh --quick on Linux/macOS/Git Bash)
+```
+
+Every run ends with a summary table, one PASS, FAIL or SKIP line per stage:
+
+| Command | What runs | Time | Needs |
+|---|---|---|---|
+| `test.ps1 -Quick` | build, all unit tests, a Hello World smoke test | about 1 min | Go |
+| `test.ps1` | the above, plus the acceptance goals G1–G15 (real binaries, real sites, real browsers) | a few min | Go, Node.js |
+| `test.ps1 -Full` | the above, plus Docker and Let's Encrypt (ACME) goals, the 1998 reference interpreter, and the race detector | about 10 min | Go, Node.js, Docker running |
+
+The bash equivalents are `scripts/test.sh --quick`, `scripts/test.sh` and `scripts/test.sh --full`.
+
+- **Single goal:** `go test -tags acceptance -run G6 -v ./acceptance` runs just the Angular goal. The full list of goals is in [docs/testing.md](docs/testing.md).
+- **Windows service goal (G15):** it is skipped unless you run from an Administrator PowerShell.
+- **The browser goals** download Playwright's Chromium on first use.
+- **If something fails:**
+  - "port already in use": another server is running; stop it.
+  - "Docker is not running": start Docker Desktop.
+  - "npm is required": install Node.js LTS.
+
+The failure output above the summary names the test and shows the details.
+
+What the tests cover:
+
+- the VM, differential-tested against the original 1998 interpreter;
+- the converter, with completeness proofs that every byte value can be printed;
+- every test site crawled byte for byte;
+- Playwright browser tests of the Angular, React and Vue apps and the Malbolge transport;
+- a certificate from an ACME test CA, WASI handlers, the Windows service and Docker;
+- fuzzing, fault injection, the race detector, and builds for 8 platforms and WebAssembly.
+
+More in [docs/testing.md](docs/testing.md) and [docs/security.md](docs/security.md).
+
+## Reference
+
+**`melhttpd` flags.** Every flag also has a `MELHTTP_*` environment variable; the full list is in [docs/deployment.md](docs/deployment.md).
 
 | Flag | Default | Meaning |
 |---|---|---|
@@ -71,37 +207,25 @@ Every response from a program carries `X-Powered-By: Malbolge` and `X-Malbolge-S
 | `-metrics-addr` | off | Prometheus metrics on a private address |
 | `-service install` | | Windows: install as a service → [Windows](deploy/windows.md) |
 
-Every flag also has a `MELHTTP_*` environment variable. The full list is in [docs/deployment.md](docs/deployment.md).
-
-## Compiling `.mb` files
+**`melc` commands.** → [docs/generating.md](docs/generating.md)
 
 ```bash
-melc build --preset auto --run-build -o site ./my-app   # Angular, React, Vue, Svelte, Next, Nuxt, Astro, Gatsby, Hugo, Jekyll…
-melc gen page.html                                      # one file → page.html.mb (a chunk directory if large)
-melc gen -raw -o hello.mb hello.txt                     # no CGI header: the program prints only the file
-melc run hello.mb                                       # run any Malbolge program (stdin → stdout)
-melc check site/index.html.mb                           # validate without running
+melc build [-o site] [--preset auto] [--run-build] <dir>   # a whole site or framework app
+melc watch [-o site] [-serve :8080] <dir>                  # rebuild (and serve) on every change
+melc gen page.html                                         # one file → page.html.mb
+melc run hello.mb                                          # run any Malbolge program (stdin → stdout)
+melc check site/index.html.mb                              # validate without running
 ```
 
-On disk, `about.html.mb`, or a chunk directory `about.html.mb/000.mb, 001.mb, …`, serves `/about.html`. Hand-written programs that print only a body are named `*.raw.mb`.
+**On disk:**
 
-Output costs about 7.5 cells per byte for text and 8–11 for binary or UTF-8. Rebuilds are incremental and happen in place, even while the site is served.
+- `about.html.mb`, or a chunk directory `about.html.mb/000.mb, 001.mb, …`, serves `/about.html`;
+- `*.raw.mb` programs print only a body;
+- `*.wasi` files are WebAssembly handlers.
 
-**Full guide:** [docs/generating.md](docs/generating.md) (frameworks: [docs/frameworks.md](docs/frameworks.md)).
+**Output size:** text costs about 7.5 cells per byte, and binary or UTF-8 about 8–11.
 
-## How it's tested
-
-The tests were written first, as a ladder of 15 goals that build up to the full product, and every goal passes. They include:
-
-- a differential test of the VM against the original C interpreter;
-- completeness proofs for the converter;
-- byte-for-byte crawls of every test site;
-- Playwright tests of the Angular, React and Vue apps and of the Malbolge transport in Chromium;
-- a real Let's Encrypt-style certificate from an ACME test CA;
-- WASI handlers, a Windows service, Docker;
-- fuzzing, the race detector, fault injection, and cross-builds for 8 platforms and WebAssembly.
-
-See [docs/testing.md](docs/testing.md) and [docs/security.md](docs/security.md). All documentation: [docs/](docs/README.md).
+All documentation: [docs/](docs/README.md).
 
 ## Credits
 
