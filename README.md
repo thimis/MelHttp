@@ -31,6 +31,20 @@ Single executables with no dependencies, for **Linux, Windows, macOS and FreeBSD
 
 **Step-by-step guides for every OS:** [docs/install.md](docs/install.md). **Putting a site online** (Linux server, Docker, Windows service, macOS, FreeBSD, reverse proxies, Kubernetes): [docs/hosting.md](docs/hosting.md).
 
+## Quick start with the scripts
+
+From a clone of the repository, two scripts do everything: PowerShell for Windows, bash for Linux, macOS and Git Bash.
+
+| Task | PowerShell | bash |
+|---|---|---|
+| Run the tests (`-Quick` / `--quick`: about 1 min; `-Full` / `--full`: everything, needs Docker) | `.scripts	est.ps1` | `scripts/test.sh` |
+| Serve a demo site | `.scriptsserve.ps1 angular -Open` | `scripts/serve.sh angular --open` |
+| Serve your own folder, rebuilding on changes | `.scriptsserve.ps1 C:my-site -Watch` | `scripts/serve.sh ~/my-site --watch` |
+| Add self-signed HTTPS and metrics | `... -Https -Metrics` | `... --https --metrics` |
+| All eight demo sites in Docker | `.scriptsserve.ps1 -Docker` (`-Docker -Stop` to stop) | `scripts/serve.sh --docker` |
+
+Demo sites: `hello`, `classic`, `cgi`, `angular`, `react`, `vue`, `transport` (the Malbolge transport and playground) and `wasi`. Run `Get-Help .scriptsserve.ps1` or `scripts/serve.sh --help` for all options.
+
 ## Usage
 
 ```bash

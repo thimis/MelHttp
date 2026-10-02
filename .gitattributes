@@ -85,3 +85,4 @@ testdata/corpus/**  binary
 *.ttf    binary
 *.wasm   binary
 deploy/freebsd/melhttpd text eol=lf
+*.ps1      text eol=crlf

@@ -96,5 +96,5 @@ func printStats(w io.Writer, name string, n int, chunks [][]byte) {
 	if n > 0 {
 		ratio = float64(size) / float64(n)
 	}
-	fmt.Fprintf(w, "%s: %d bytes → %d program(s), %d bytes of Malbolge (%.1f×)\n", name, n, len(chunks), size, ratio)
+	fmt.Fprintf(w, "%s: %d bytes -> %d program(s), %d bytes of Malbolge (%.1fx)\n", name, n, len(chunks), size, ratio)
 }

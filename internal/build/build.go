@@ -64,7 +64,7 @@ func (s Stats) String() string {
 	if s.InBytes > 0 {
 		ratio = float64(s.OutBytes) / float64(s.InBytes)
 	}
-	return fmt.Sprintf("%d files (%d compiled, %d unchanged, %d hand-written programs) → %d programs; %d → %d bytes (%.1f×) in %v",
+	return fmt.Sprintf("%d files (%d compiled, %d unchanged, %d hand-written programs) -> %d programs; %d -> %d bytes (%.1fx) in %v",
 		s.Files, s.Compiled, s.Reused, s.Copied, s.Programs, s.InBytes, s.OutBytes, ratio, s.Duration.Round(time.Millisecond))
 }
 
