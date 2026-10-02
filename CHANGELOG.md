@@ -11,6 +11,9 @@ the site layout or the MelCGI contract.
   The server adds the transport script to every HTML page.
 - `scripts/serve -Obfuscate` (`--obfuscate`) turns it on for any demo or folder,
   e.g. `.\scripts\serve.ps1 angular -Obfuscate -Open`.
+- Docker: `docker compose up -d --wait angular-transport` serves the Angular
+  showcase over the transport on port 8088.
+- README quick start for the Angular showcase (Docker, or Go and Node.js).
 
 ## [0.1.0] - 2026-10-02
 

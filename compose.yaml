@@ -10,6 +10,9 @@
 #     http://localhost:8086  Malbolge transport (pages travel as Malbolge; reload once) + /_melhttp/playground.html
 #     http://localhost:8087  WASI handlers (/hello.html is Go compiled to WebAssembly)
 #
+#   docker compose up -d --wait angular-transport
+#     http://localhost:8088  the Angular showcase over the Malbolge transport (reload once)
+#
 # Compile your own site without installing Go:
 #   docker compose run --rm melc build -o /work/site /work/my-site
 
@@ -64,6 +67,17 @@ services:
       MELHTTP_ROOT: /srv/sites/wasi
       MELHTTP_WASI: "true"
     ports: ["8087:8080"]
+
+  # The Angular showcase over the Malbolge transport (reload once):
+  #   docker compose up --build -d --wait angular-transport   → http://localhost:8088
+  angular-transport:
+    <<: *melhttp
+    profiles: ["transport"]
+    environment:
+      MELHTTP_ROOT: /srv/sites/angular
+      MELHTTP_EXPOSE_SOURCE: "true"
+      MELHTTP_OBFUSCATE_INJECT: "true"
+    ports: ["8088:8080"]
 
   # The compiler as a tool: docker compose run --rm melc build -o /work/site /work/my-site
   melc:

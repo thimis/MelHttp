@@ -6,6 +6,40 @@ It serves real sites: the repository includes an Angular Material app, React and
 
 > **Status: alpha (0.1.0).** It works and is heavily tested, but flags, the site layout and the MelCGI contract may still change before 1.0. See the [changelog](CHANGELOG.md).
 
+## Quick start: the Angular showcase
+
+Serve the included Angular Material app, with every byte printed by Malbolge, in one of two ways.
+
+**With Docker** (nothing else to install):
+
+```bash
+git clone https://github.com/thimis/MelHttp.git
+cd MelHttp
+docker compose up --build -d --wait angular     # the first build takes a few minutes
+```
+
+Open http://localhost:8080. Stop it with `docker compose down`.
+
+**With Go and Node.js** ([Go](https://go.dev/dl/) 1.26+ and [Node.js](https://nodejs.org/) LTS; on Windows: `winget install GoLang.Go` and `winget install OpenJS.NodeJS.LTS`, then open a new terminal):
+
+```powershell
+git clone https://github.com/thimis/MelHttp.git
+cd MelHttp
+.\scripts\serve.ps1 angular -Open               # Windows
+```
+
+```bash
+scripts/serve.sh angular --open                 # Linux, macOS, Git Bash
+```
+
+The first run installs the app's packages, builds it, compiles every file to Malbolge and opens http://localhost:8080. Later runs start in seconds. Stop it with Ctrl+C.
+
+**Then try:**
+
+- **Malbolge corner** (in the app's menu): see the Malbolge program behind the page.
+- **Malbolge transport:** add `-Obfuscate` (`--obfuscate`) to the serve command. With Docker, run `docker compose up -d --wait angular-transport` and open http://localhost:8088; stop it with `docker compose --profile transport down`.
+  Reload the page once. From then on, every file reaches the browser as a Malbolge program and is decoded there. In DevTools → Network, the rows with a ⚙ icon show the Malbolge on the wire.
+
 ## How it works
 
 1. **`melc build`** compiles every file of your site, binary files included, into Malbolge programs that print it. Each program first prints a small CGI-style header. Large files become several programs ("chunks"), and every program is run once to verify it before it is written. → [generator](docs/generator.md)
