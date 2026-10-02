@@ -4,14 +4,19 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/thimis/MelHttp/internal/malbolge"
 	"github.com/thimis/MelHttp/internal/mbfile"
 	"github.com/thimis/MelHttp/internal/melcgi"
+	"github.com/thimis/MelHttp/internal/server"
 )
 
 func write(t *testing.T, root, rel string, data []byte) {
@@ -254,5 +259,64 @@ func TestWASIPassThrough(t *testing.T) {
 	write(t, src, "bad.wasi", []byte("not wasm"))
 	if _, err := Site(context.Background(), Options{Src: src, Out: out}); err == nil {
 		t.Fatal("accepted a non-wasm .wasi file")
+	}
+}
+
+// TestRebuildWhileServing: a site can be rebuilt while melhttpd serves it
+// (on Windows replacing the directory would fail); changed pages update,
+// deleted pages disappear, and unchanged outputs keep their timestamps so
+// the server's cache stays warm.
+func TestRebuildWhileServing(t *testing.T) {
+	src, _ := fixture(t)
+	out := filepath.Join(t.TempDir(), "site")
+	if _, err := Site(context.Background(), Options{Src: src, Out: out}); err != nil {
+		t.Fatal(err)
+	}
+	srv, err := server.New(server.Config{Root: out, Revalidate: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+	body := func(p string) (int, string) {
+		res, err := http.Get(ts.URL + p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		b, _ := io.ReadAll(res.Body)
+		return res.StatusCode, string(b)
+	}
+	if code, b := body("/css/site.css"); code != 200 || b != "h1{color:#c00}" {
+		t.Fatalf("before: %d %q", code, b)
+	}
+	before, _ := os.Stat(filepath.Join(out, "index.html.mb"))
+	time.Sleep(20 * time.Millisecond)
+	write(t, src, "css/site.css", []byte("h1{color:#0a0}"))
+	os.Remove(filepath.Join(src, "img", "pixel.png"))
+	write(t, src, "new.txt", []byte("fresh"))
+	st, err := Site(context.Background(), Options{Src: src, Out: out})
+	if err != nil {
+		t.Fatalf("rebuild while serving: %v", err)
+	}
+	if st.Compiled != 2 {
+		t.Errorf("rebuild compiled %d files, want 2", st.Compiled)
+	}
+	if code, b := body("/css/site.css"); code != 200 || b != "h1{color:#0a0}" {
+		t.Errorf("changed page: %d %q", code, b)
+	}
+	if code, _ := body("/img/pixel.png"); code != 404 {
+		t.Errorf("deleted page still served: %d", code)
+	}
+	if code, b := body("/new.txt"); code != 200 || b != "fresh" {
+		t.Errorf("new page: %d %q", code, b)
+	}
+	after, _ := os.Stat(filepath.Join(out, "index.html.mb"))
+	if !after.ModTime().Equal(before.ModTime()) {
+		t.Error("an unchanged output was rewritten")
+	}
+	if entries, _ := filepath.Glob(out + ".tmp-*"); len(entries) > 0 {
+		t.Errorf("staging left behind: %v", entries)
 	}
 }

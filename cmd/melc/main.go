@@ -21,6 +21,7 @@ Usage:
   melc check <program.mb | chunk-dir.mb>...                     validate programs
   melc gen   [-o out.mb] [-raw] [-type mime] <file>              compile one file into Malbolge
   melc build [-o out-dir] [--preset name] [--run-build] <dir>    compile a whole site into Malbolge
+  melc watch [-o out-dir] [-serve :8080] <dir>                   rebuild on every change (and serve)
   melc version
 
 Run "melc <command> -h" for command flags.
@@ -57,6 +58,8 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		return cmdGen(ctx, rest, stdout, stderr)
 	case "build":
 		return cmdBuild(ctx, rest, stdout, stderr)
+	case "watch":
+		return cmdWatch(ctx, rest, stdout, stderr)
 	case "version", "-version", "--version":
 		fmt.Fprintln(stdout, "melc", version)
 		return exitOK

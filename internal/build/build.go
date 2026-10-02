@@ -14,6 +14,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -167,10 +168,7 @@ func Site(ctx context.Context, opt Options) (Stats, error) {
 	if err := os.WriteFile(filepath.Join(tmp, Marker), []byte("built by melc; this directory is replaced on rebuild\n"), 0o644); err != nil {
 		return st, err
 	}
-	if err := os.RemoveAll(out); err != nil {
-		return st, err
-	}
-	if err := os.Rename(tmp, out); err != nil {
+	if err := publish(tmp, out, files); err != nil {
 		return st, err
 	}
 	st = Stats{
@@ -283,10 +281,10 @@ func buildFile(ctx context.Context, src, out, tmp, rel string, old manifest, see
 	dst := filepath.Join(tmp, filepath.FromSlash(rel)+".mb")
 	prev := filepath.Join(out, filepath.FromSlash(rel)+".mb")
 	if old.Generator == GeneratorVersion && old.Files[rel] == hash {
+		// Unchanged: leave the existing output alone (a running server keeps
+		// its cached response, since the files' times do not change).
 		if set, err := mbfile.Load(prev); err == nil {
-			if n, err := copyTree(prev, dst); err == nil {
-				return "reused", hash, int64(len(data)), n, len(set.Programs), nil
-			}
+			return "reused", hash, int64(len(data)), treeSize(prev), len(set.Programs), nil
 		}
 	}
 	program := append(melcgi.HeaderBlock(mimetype.ByName(rel)), data...)
@@ -368,4 +366,88 @@ func writeJSON(path string, v any) error {
 		return err
 	}
 	return os.WriteFile(path, append(data, '\n'), 0o644)
+}
+
+// outputPath is where the output for a source file lives in the site.
+func outputPath(rel string) string {
+	l := strings.ToLower(rel)
+	if strings.HasSuffix(l, ".mb") || strings.HasSuffix(l, ".wasi") {
+		return rel // hand-written programs and WASI handlers are copied as is
+	}
+	return rel + ".mb"
+}
+
+// publish moves the staged build in tmp into out. A new out is created with
+// a single rename. An existing out is updated in place — staged outputs
+// replace their old versions, outputs of deleted sources are removed, and
+// unchanged outputs are left untouched — so a server can keep serving the
+// directory while it is rebuilt (replacing the directory itself would fail
+// on Windows and leave a server on Linux serving the old copy).
+func publish(tmp, out string, files []string) error {
+	if entries, err := os.ReadDir(out); err != nil || len(entries) == 0 {
+		os.Remove(out)
+		return os.Rename(tmp, out)
+	}
+	keep := map[string]bool{server.SiteConfigFile: true, manifestName: true, Marker: true}
+	parents := map[string]bool{}
+	for _, rel := range files {
+		p := outputPath(rel)
+		keep[p] = true
+		for d := path.Dir(p); d != "."; d = path.Dir(d) {
+			parents[d] = true
+		}
+	}
+	for p := range keep {
+		staged := filepath.Join(tmp, filepath.FromSlash(p))
+		if _, err := os.Lstat(staged); err != nil {
+			continue // unchanged: nothing staged
+		}
+		dst := filepath.Join(out, filepath.FromSlash(p))
+		if err := os.RemoveAll(dst); err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return err
+		}
+		if err := os.Rename(staged, dst); err != nil {
+			return err
+		}
+	}
+	// Remove outputs whose sources are gone.
+	return filepath.WalkDir(out, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || p == out {
+			return err
+		}
+		rel, _ := filepath.Rel(out, p)
+		rel = filepath.ToSlash(rel)
+		switch {
+		case keep[rel]:
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		case d.IsDir() && parents[rel]:
+			return nil
+		}
+		if err := os.RemoveAll(p); err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return filepath.SkipDir
+		}
+		return nil
+	})
+}
+
+func treeSize(p string) int64 {
+	var n int64
+	filepath.WalkDir(p, func(_ string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			if fi, err := d.Info(); err == nil {
+				n += fi.Size()
+			}
+		}
+		return nil
+	})
+	return n
 }
