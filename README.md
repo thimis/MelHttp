@@ -231,7 +231,7 @@ What the tests cover:
 
 More in [docs/testing.md](docs/testing.md) and [docs/security.md](docs/security.md).
 
-## Reference
+## Reference 
 
 **`melhttpd` flags.** Every flag also has a `MELHTTP_*` environment variable; the full list is in [docs/deployment.md](docs/deployment.md).
 
