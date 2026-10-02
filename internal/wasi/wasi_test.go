@@ -49,12 +49,25 @@ func run(t *testing.T, r *Runner, query string, timeout time.Duration, maxOut in
 	return out.String(), err
 }
 
-func TestRunHandler(t *testing.T) {
-	r, err := New(context.Background(), 64)
+// newRunner returns a Runner with the test handler already compiled, as
+// melhttpd does at warm-up: compiling is slow (very slow under -race on a
+// small CI machine) and must not count against the requests' time limits.
+func newRunner(t *testing.T, memoryMB int) *Runner {
+	t.Helper()
+	r, err := New(context.Background(), memoryMB)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close(context.Background())
+	t.Cleanup(func() { r.Close(context.Background()) })
+	mod := handler(t)
+	if err := r.Precompile(context.Background(), "hi.txt.wasi", "v1", func() ([]byte, error) { return mod, nil }); err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+func TestRunHandler(t *testing.T) {
+	r := newRunner(t, 64)
 	out, err := run(t, r, "", 30*time.Second, 1<<20)
 	if err != nil {
 		t.Fatal(err)
@@ -72,11 +85,7 @@ func TestRunHandler(t *testing.T) {
 }
 
 func TestSandbox(t *testing.T) {
-	r, err := New(context.Background(), 32)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer r.Close(context.Background())
+	r := newRunner(t, 32)
 	if out, err := run(t, r, "fs", 30*time.Second, 1<<20); err != nil || !strings.Contains(out, "fs: open /etc/passwd") {
 		t.Errorf("file system must be unavailable: %q %v", out, err)
 	}
