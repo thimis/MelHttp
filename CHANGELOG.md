@@ -4,17 +4,6 @@ All notable changes to MelHttp. Versions follow [Semantic Versioning](https://se
 while the version is 0.x, MelHttp is **alpha** and any release may change flags,
 the site layout or the MelCGI contract.
 
-## [Unreleased]
-
-### Added
-- `melhttpd -obfuscate-inject`: the Malbolge transport for any site, unchanged.
-  The server adds the transport script to every HTML page.
-- `scripts/serve -Obfuscate` (`--obfuscate`) turns it on for any demo or folder,
-  e.g. `.\scripts\serve.ps1 angular -Obfuscate -Open`.
-- Docker: `docker compose up -d --wait angular-transport` serves the Angular
-  showcase over the transport on port 8088.
-- README quick start for the Angular showcase (Docker, or Go and Node.js).
-
 ## [0.1.0] - 2026-10-02
 
 First alpha release.
@@ -35,6 +24,8 @@ First alpha release.
   self-signed certificates for testing, HTTP→HTTPS redirect, HSTS, HTTP/2.
 - Malbolge transport: pages travel to the browser as Malbolge programs and a
   service worker decodes them (obfuscation, not encryption).
+  `-obfuscate-inject` turns it on for any site unchanged, by adding the
+  transport script to every HTML page.
 - In-browser Malbolge playground.
 - WASI handlers: WebAssembly modules as sandboxed handlers.
 - Native Windows service; systemd, launchd, FreeBSD rc.d and Kubernetes
@@ -48,6 +39,10 @@ First alpha release.
 ### Distribution
 - Binaries for Linux, Windows, macOS and FreeBSD on x86-64 and ARM64.
 - Docker image and a compose file with eight demo sites.
-- `scripts/test` and `scripts/serve` (PowerShell and bash).
+- `scripts/test` and `scripts/serve` (PowerShell and bash); `serve -Obfuscate`
+  serves any site over the Malbolge transport.
+- Docker: `docker compose up -d --wait angular-transport` serves the Angular
+  showcase over the transport on port 8088.
+- README quick start for the Angular showcase.
 
 [0.1.0]: https://github.com/thimis/MelHttp/releases/tag/v0.1.0

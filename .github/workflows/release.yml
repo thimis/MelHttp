@@ -25,6 +25,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+      - name: generate browser VM assets
+        run: go generate ./internal/webvm
       - run: go test ./...
       - run: go run ./tools/dist -version "${GITHUB_REF_NAME}"
       - name: publish GitHub Release
