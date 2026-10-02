@@ -22,6 +22,21 @@ Add one line to the pages that should opt in:
 <script src="/_melhttp/obfuscate.js"></script>
 ```
 
+Or let the server add it: **`-obfuscate-inject`** (implies `-obfuscate`)
+puts that line before `</head>` of every HTML response, or at the end when a
+page has no `</head>`. Pages that already include it are left alone. Any site,
+such as an Angular, React or Vue build, then uses the transport without being
+changed:
+
+```bash
+melhttpd -root site -spa -obfuscate-inject
+scripts/serve.sh angular --obfuscate --open     # Windows: .\scripts\serve.ps1 angular -Obfuscate -Open
+```
+
+The script is added when the response is produced, so it is part of the page's
+ETag and gzip variant. With the flag off, pages are served byte for byte as
+compiled.
+
 1. The first visit is ordinary HTTP. `obfuscate.js` installs a service worker
    (`/_melhttp/sw.js`) for the whole site.
 2. From the next navigation on, the worker re-sends every same-origin GET with

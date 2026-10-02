@@ -24,6 +24,10 @@
     .\scripts\serve.ps1 angular -Open
     Builds the Angular showcase (first time only) and opens it in the browser.
 .EXAMPLE
+    .\scripts\serve.ps1 angular -Obfuscate -Open
+    Serves the Angular app over the Malbolge transport: after one reload, every page and
+    file travels to the browser as a Malbolge program. Works with any site.
+.EXAMPLE
     .\scripts\serve.ps1 C:\my-site -Watch -Open
     Serves your folder and rebuilds it whenever a file changes.
 .EXAMPLE
@@ -41,12 +45,17 @@ param(
     [switch]$Watch,     # rebuild on every change (your own folders)
     [switch]$Open,      # open the browser when the site is ready
     [switch]$Metrics,   # Prometheus metrics on http://127.0.0.1:9090/metrics
+    [switch]$Obfuscate, # Malbolge transport for any site: pages travel to the browser as Malbolge
     [switch]$Rebuild,   # rebuild framework apps even if they were built before
     [switch]$Docker,    # all demo sites in Docker
     [switch]$Stop       # with -Docker: stop the containers
 )
 
 . "$PSScriptRoot\_common.ps1"
+
+if ($Obfuscate -and ($Watch -or $Docker)) {
+    throw "-Obfuscate works with a single site, not with -Watch or -Docker (in Docker, the transport demo is on port 8086)."
+}
 
 # ---- Docker: all demo sites ---------------------------------------------------
 if ($Docker) {
@@ -132,6 +141,12 @@ $urls = @("http://localhost:$Port")
 if ($Https) {
     $serverArgs += '-tls-self-signed', '-tls-addr', ":$HttpsPort", '-https-redirect=false'
     $urls += "https://localhost:$HttpsPort  (self-signed: accept the browser warning)"
+}
+if ($Obfuscate -and $extra -notcontains '-obfuscate') {
+    $serverArgs += '-obfuscate-inject'
+    $hint = "Malbolge transport is on: reload the page once, then every page and file travels as Malbolge " +
+            "(DevTools > Network: responses carry X-Malbolge-Decoded). Use the http:// address: " +
+            "browsers refuse service workers on self-signed HTTPS."
 }
 if ($Metrics) {
     $serverArgs += '-metrics-addr', '127.0.0.1:9090'

@@ -57,6 +57,8 @@ Other demos to try instead of `classic`:
 | `transport` | pages travel as Malbolge programs to the browser; plus the playground |
 | `wasi` | a Go program compiled to WebAssembly |
 
+Add `-Obfuscate` (`--obfuscate`) to send any site over the Malbolge transport, for example `.\scripts\serve.ps1 angular -Obfuscate -Open`. Reload the page once, and from then on every page and file reaches the browser as a Malbolge program.
+
 `.\scripts\serve.ps1 -Docker` (`scripts/serve.sh --docker`) starts all eight demo sites in Docker.
 
 ## Build your own app
@@ -205,6 +207,7 @@ More in [docs/testing.md](docs/testing.md) and [docs/security.md](docs/security.
 | `-acme-domains`, `-tls-cert`/`-tls-key`, `-tls-self-signed` | off | HTTPS on `-tls-addr` (`:8443`); plain HTTP then redirects; `-hsts 8760h` adds HSTS |
 | `-spa` | off | serve `index.html` for unknown paths (usually set by `melc build`) |
 | `-obfuscate` / `-playground` | off | Malbolge transport for browsers / in-browser playground → [transport](docs/transport.md) |
+| `-obfuscate-inject` | off | `-obfuscate` for any site, unchanged: adds the transport script to every HTML page |
 | `-wasi` | off | run `*.wasi` WebAssembly handlers → [WASI](docs/wasi.md) |
 | `-metrics-addr` | off | Prometheus metrics on a private address |
 | `-service install` | | Windows: install as a service → [Windows](deploy/windows.md) |

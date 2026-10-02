@@ -15,11 +15,11 @@ import (
 func TestServiceArgs(t *testing.T) {
 	abs := func(p string) string { a, _ := filepath.Abs(p); return a }
 	got := serviceArgs([]string{
-		"-service", "install", "-service-name=web", "-root", "site", "-addr", ":80",
+		"-service", "install", "-obfuscate-inject", "-service-name=web", "-root", "site", "-addr", ":80",
 		"-spa", "-log-file=logs/m.log", "--tls-cert", "c.pem", "-tls-key=k.pem", "-wasi",
 	})
 	want := []string{
-		"-root=" + abs("site"), "-addr", ":80", "-spa", "-log-file=" + abs("logs/m.log"),
+		"-obfuscate-inject", "-root=" + abs("site"), "-addr", ":80", "-spa", "-log-file=" + abs("logs/m.log"),
 		"-tls-cert=" + abs("c.pem"), "-tls-key=" + abs("k.pem"), "-wasi",
 	}
 	if !reflect.DeepEqual(got, want) {

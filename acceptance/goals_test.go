@@ -330,6 +330,14 @@ func TestG6_AngularShowcase(t *testing.T) {
 		t.Errorf("/_source/index.html = %d", r.Status)
 	}
 	runPlaywright(t, proj, base)
+
+	// The same app with the Malbolge transport switched on for an unmodified
+	// site (-obfuscate-inject): every file reaches the browser as Malbolge.
+	obf := startServer(t, out, "-obfuscate-inject")
+	if r := get(t, obf+"/dashboard"); !bytes.Contains(r.Body, []byte(`<script src="/_melhttp/obfuscate.js"></script></head>`)) {
+		t.Fatalf("transport script not injected before </head>")
+	}
+	runPlaywright(t, proj, obf, "MELHTTP_TRANSPORT=1")
 }
 
 // ---------------------------------------------------------------------------
@@ -575,7 +583,9 @@ var playwrightOnce sync.Once
 
 // runPlaywright runs a test site's Playwright suite against base. The first
 // call installs Playwright's Chromium if needed (a no-op when it is cached).
-func runPlaywright(t *testing.T, proj, base string) {
+// runPlaywright runs a project's Playwright tests against base; env adds
+// NAME=value settings for the test run.
+func runPlaywright(t *testing.T, proj, base string, env ...string) {
 	t.Helper()
 	playwrightOnce.Do(func() {
 		cmd := exec.Command(npxCmd(), "playwright", "install", "chromium")
@@ -588,7 +598,7 @@ func runPlaywright(t *testing.T, proj, base string) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, npxCmd(), "playwright", "test", "--reporter=line")
 	cmd.Dir = proj
-	cmd.Env = append(os.Environ(), "BASE_URL="+base)
+	cmd.Env = append(append(os.Environ(), "BASE_URL="+base), env...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("playwright: %v\n%s", err, out)
 	}

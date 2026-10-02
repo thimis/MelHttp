@@ -3,6 +3,8 @@ package main
 import (
 	"path/filepath"
 	"strings"
+
+	"github.com/thimis/MelHttp/internal/config"
 )
 
 // serviceArgs prepares the flags stored in a Windows service definition: the
@@ -21,7 +23,7 @@ func serviceArgs(args []string) []string {
 			out = append(out, a)
 			continue
 		}
-		takesValue := !hasValue && i+1 < len(args) && !isBoolFlag(name)
+		takesValue := !hasValue && i+1 < len(args) && !config.IsBoolFlag(name)
 		if skip[name] {
 			if takesValue {
 				i++
@@ -42,14 +44,4 @@ func serviceArgs(args []string) []string {
 		out = append(out, a)
 	}
 	return out
-}
-
-// isBoolFlag lists melhttpd's boolean flags (they take no separate value).
-func isBoolFlag(name string) bool {
-	switch name {
-	case "spa", "expose-source", "no-cache", "warm", "allow-sensitive-headers", "healthcheck", "version",
-		"tls-self-signed", "https-redirect", "obfuscate", "playground", "wasi":
-		return true
-	}
-	return false
 }

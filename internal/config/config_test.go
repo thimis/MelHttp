@@ -95,3 +95,27 @@ func TestTLSFlags(t *testing.T) {
 		}
 	}
 }
+
+func TestIsBoolFlag(t *testing.T) {
+	for _, name := range []string{"spa", "obfuscate", "obfuscate-inject", "playground", "wasi", "warm", "tls-self-signed"} {
+		if !IsBoolFlag(name) {
+			t.Errorf("%s should be a boolean flag", name)
+		}
+	}
+	for _, name := range []string{"root", "addr", "service", "obfuscate-variants", "acme-domains", "no-such-flag"} {
+		if IsBoolFlag(name) {
+			t.Errorf("%s should not be a boolean flag", name)
+		}
+	}
+}
+
+func TestObfuscateInject(t *testing.T) {
+	c, err := Parse([]string{"-obfuscate-inject"}, env(nil), io.Discard)
+	if err != nil || !c.Server.ObfuscateInject {
+		t.Fatalf("flag: %v %+v", err, c.Server)
+	}
+	c, err = Parse(nil, env(map[string]string{"MELHTTP_OBFUSCATE_INJECT": "true"}), io.Discard)
+	if err != nil || !c.Server.ObfuscateInject {
+		t.Fatalf("env: %v %+v", err, c.Server)
+	}
+}

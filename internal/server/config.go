@@ -35,7 +35,10 @@ type Config struct {
 	// Obfuscate enables the Malbolge transport: requests carrying
 	// "X-Malbolge-Accept: program" get the body as Malbolge programs, and
 	// /_melhttp/ serves the service worker that decodes them in browsers.
-	Obfuscate         bool
+	Obfuscate bool
+	// ObfuscateInject adds the transport's opt-in script to every HTML
+	// response, so any site uses the transport unchanged. Implies Obfuscate.
+	ObfuscateInject   bool
 	ObfuscateVariants int  // differently-seeded encodings kept per page (default 2)
 	Playground        bool // serve the in-browser Malbolge playground at /_melhttp/
 	// WASI enables WebAssembly MelCGI handlers (*.wasi files), sandboxed by
@@ -63,6 +66,9 @@ func (c Config) withDefaults() Config {
 	}
 	if c.CacheBytes <= 0 {
 		c.CacheBytes = 512 << 20
+	}
+	if c.ObfuscateInject {
+		c.Obfuscate = true
 	}
 	if c.ObfuscateVariants <= 0 {
 		c.ObfuscateVariants = 2

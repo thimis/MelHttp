@@ -12,12 +12,14 @@
 #   --watch          rebuild on every change (your own folders)
 #   --open           open the browser when ready
 #   --metrics        Prometheus metrics on http://127.0.0.1:9090/metrics
+#   --obfuscate      Malbolge transport for any site: pages travel to the browser as Malbolge
 #   --rebuild        rebuild framework apps even if built before
 #   --docker         all eight demo sites in Docker (ports 8080-8087); --docker --stop stops them
 #
 # Examples:
 #   scripts/serve.sh                       # classic demo on http://localhost:8080
 #   scripts/serve.sh angular --open
+#   scripts/serve.sh angular --obfuscate --open   # the Angular app over the Malbolge transport
 #   scripts/serve.sh ~/my-site --watch --open
 #   scripts/serve.sh classic --https
 #   scripts/serve.sh --docker
@@ -27,7 +29,7 @@
 source "$(dirname "$0")/_common.sh"
 
 SITE=classic PORT=8080 HTTPS_PORT=8443
-HTTPS=0 WATCH=0 OPEN=0 METRICS=0 REBUILD=0 DOCKER=0 STOP=0
+HTTPS=0 WATCH=0 OPEN=0 METRICS=0 OBFUSCATE=0 REBUILD=0 DOCKER=0 STOP=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --port)       PORT="$2"; shift ;;
@@ -36,10 +38,11 @@ while [ $# -gt 0 ]; do
     --watch)      WATCH=1 ;;
     --open)       OPEN=1 ;;
     --metrics)    METRICS=1 ;;
+    --obfuscate)  OBFUSCATE=1 ;;
     --rebuild)    REBUILD=1 ;;
     --docker)     DOCKER=1 ;;
     --stop)       STOP=1 ;;
-    -h|--help)    sed -n '2,26p' "$0"; exit 0 ;;
+    -h|--help)    sed -n '2,28p' "$0"; exit 0 ;;
     -*)           die "unknown option $1 (see --help)" ;;
     *)            SITE="$1" ;;
   esac
@@ -47,6 +50,9 @@ while [ $# -gt 0 ]; do
 done
 
 # ---- Docker: all demo sites -------------------------------------------------
+if [ "$OBFUSCATE" = 1 ] && { [ "$WATCH" = 1 ] || [ "$DOCKER" = 1 ]; }; then
+  die "--obfuscate works with a single site, not with --watch or --docker (in Docker, the transport demo is on port 8086)."
+fi
 if [ "$DOCKER" = 0 ]; then ensure_go; fi
 if [ "$DOCKER" = 1 ]; then
   docker_running || die "Docker is not running. Start Docker and try again."
@@ -106,6 +112,10 @@ URLS=("http://localhost:$PORT")
 if [ "$HTTPS" = 1 ]; then
   SERVER_ARGS+=(-tls-self-signed -tls-addr ":$HTTPS_PORT" -https-redirect=false)
   URLS+=("https://localhost:$HTTPS_PORT  (self-signed: accept the browser warning)")
+fi
+if [ "$OBFUSCATE" = 1 ] && [[ " ${EXTRA[*]-} " != *" -obfuscate "* ]]; then
+  SERVER_ARGS+=(-obfuscate-inject)
+  HINT="Malbolge transport is on: reload the page once, then every page and file travels as Malbolge (DevTools > Network: responses carry X-Malbolge-Decoded). Use the http:// address: browsers refuse service workers on self-signed HTTPS."
 fi
 if [ "$METRICS" = 1 ]; then
   SERVER_ARGS+=(-metrics-addr 127.0.0.1:9090)

@@ -53,12 +53,9 @@ func (t TLS) Enabled() bool {
 	return t.CertFile != "" || t.KeyFile != "" || t.SelfSigned || len(t.ACMEDomains) > 0
 }
 
-// Parse reads flags from args and environment variables via getenv.
-func Parse(args []string, getenv func(string) string, output io.Writer) (Config, error) {
-	var c Config
+// flagSet defines melhttpd's flags, storing their values in c.
+func flagSet(c *Config, cacheMB *int64) *flag.FlagSet {
 	fs := flag.NewFlagSet("melhttpd", flag.ContinueOnError)
-	fs.SetOutput(output)
-	var cacheMB int64
 	fs.StringVar(&c.Addr, "addr", ":8080", "listen `address`")
 	fs.StringVar(&c.Server.Root, "root", "site", "site `directory` (built with melc build)")
 	fs.BoolVar(&c.Server.SPA, "spa", false, "serve /index.html for unknown extension-less paths (single-page apps)")
@@ -70,7 +67,7 @@ func Parse(args []string, getenv func(string) string, output io.Writer) (Config,
 	fs.DurationVar(&c.Server.Timeout, "timeout", 30*time.Second, "time limit per program run")
 	fs.Int64Var(&c.Server.MaxBody, "max-body", 1<<20, "request body bytes passed to programs")
 	fs.IntVar(&c.Server.MaxConcurrent, "concurrency", 0, "simultaneous VM runs (0 = 2×CPUs)")
-	fs.Int64Var(&cacheMB, "cache-mb", 512, "response cache size in MiB")
+	fs.Int64Var(cacheMB, "cache-mb", 512, "response cache size in MiB")
 	fs.BoolVar(&c.Server.AllowSensitiveHeaders, "allow-sensitive-headers", false, "pass Cookie and Authorization to programs")
 	fs.StringVar(&c.LogFormat, "log-format", "text", "log format: text or json")
 	fs.StringVar(&c.MetricsAddr, "metrics-addr", "", "serve Prometheus metrics at /metrics on this private `address` (e.g. 127.0.0.1:9090)")
@@ -101,11 +98,31 @@ func Parse(args []string, getenv func(string) string, output io.Writer) (Config,
 	fs.StringVar(&c.TLS.MinVersion, "tls-min", "1.2", "minimum TLS `version`: 1.2 or 1.3")
 	fs.DurationVar(&c.Server.HSTS, "hsts", 0, "send Strict-Transport-Security with this max-age on HTTPS (e.g. 8760h; 0 = off)")
 	fs.BoolVar(&c.Server.Obfuscate, "obfuscate", false, "Malbolge transport: send bodies as Malbolge programs to the /_melhttp/ service worker (obfuscation, not encryption)")
+	fs.BoolVar(&c.Server.ObfuscateInject, "obfuscate-inject", false, "add the transport script to every HTML page, so any site uses the Malbolge transport unchanged (implies -obfuscate)")
 	fs.IntVar(&c.Server.ObfuscateVariants, "obfuscate-variants", 2, "differently-seeded encodings kept per page")
 	fs.BoolVar(&c.Server.Playground, "playground", false, "serve the in-browser Malbolge playground at /_melhttp/")
 	fs.BoolVar(&c.Server.WASI, "wasi", false, "run WebAssembly MelCGI handlers (*.wasi files), sandboxed: no files, environment or network")
 	fs.IntVar(&c.Server.WASIMemoryMB, "wasi-memory-mb", 64, "memory limit per WASI handler run, in MiB")
+	return fs
+}
 
+// IsBoolFlag reports whether name is one of melhttpd's boolean flags
+// (which take no separate value argument).
+func IsBoolFlag(name string) bool {
+	f := flagSet(&Config{}, new(int64)).Lookup(name)
+	if f == nil {
+		return false
+	}
+	b, ok := f.Value.(interface{ IsBoolFlag() bool })
+	return ok && b.IsBoolFlag()
+}
+
+// Parse reads flags from args and environment variables via getenv.
+func Parse(args []string, getenv func(string) string, output io.Writer) (Config, error) {
+	var c Config
+	var cacheMB int64
+	fs := flagSet(&c, &cacheMB)
+	fs.SetOutput(output)
 	set := map[string]bool{}
 	if err := fs.Parse(args); err != nil {
 		return c, err

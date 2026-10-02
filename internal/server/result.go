@@ -88,7 +88,7 @@ func (s *Server) produce(ctx context.Context, e *entry, r *http.Request) (*resul
 			return nil, &httpError{http.StatusNotFound, err}
 		}
 		h := http.Header{"Content-Type": {mimetype.ByName(e.url)}}
-		return finish(&result{status: http.StatusOK, header: h, body: body, deterministic: true, version: version}), nil
+		return s.finish(&result{status: http.StatusOK, header: h, body: body, deterministic: true, version: version}), nil
 	}
 	if (e.kind == kindWASI || e.kind == kindWASIRaw) && s.wasi == nil {
 		return nil, &httpError{http.StatusNotFound, errors.New("WASI handlers are disabled (-wasi)")}
@@ -133,10 +133,17 @@ func (s *Server) produce(ctx context.Context, e *entry, r *http.Request) (*resul
 	} else if resp, err = melcgi.ParseResponse(out.Bytes()); err != nil {
 		return nil, &httpError{http.StatusBadGateway, fmt.Errorf("%s: %w", e.file, err)}
 	}
-	return finish(&result{
+	return s.finish(&result{
 		status: resp.Status, header: resp.Header, body: resp.Body, steps: run.Steps,
 		program: true, deterministic: !run.ReadInput, version: version,
 	}), nil
+}
+
+// finish applies the server's body rewrites (the transport script) and then
+// computes the ETag and gzip variant.
+func (s *Server) finish(r *result) *result {
+	s.maybeInject(r)
+	return finish(r)
 }
 
 // finish computes the ETag and, for compressible bodies, a gzip variant.
@@ -329,7 +336,7 @@ func (s *Server) produceWASI(ctx context.Context, e *entry, version string, in i
 	} else if resp, err = melcgi.ParseResponse(out.Bytes()); err != nil {
 		return nil, &httpError{http.StatusBadGateway, fmt.Errorf("%s: %w", e.file, err)}
 	}
-	return finish(&result{status: resp.Status, header: resp.Header, body: resp.Body, wasm: true, version: version}), nil
+	return s.finish(&result{status: resp.Status, header: resp.Header, body: resp.Body, wasm: true, version: version}), nil
 }
 
 func (s *Server) wasiLoader(e *entry) func() ([]byte, error) {

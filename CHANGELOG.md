@@ -4,6 +4,14 @@ All notable changes to MelHttp. Versions follow [Semantic Versioning](https://se
 while the version is 0.x, MelHttp is **alpha** and any release may change flags,
 the site layout or the MelCGI contract.
 
+## [Unreleased]
+
+### Added
+- `melhttpd -obfuscate-inject`: the Malbolge transport for any site, unchanged.
+  The server adds the transport script to every HTML page.
+- `scripts/serve -Obfuscate` (`--obfuscate`) turns it on for any demo or folder,
+  e.g. `.\scripts\serve.ps1 angular -Obfuscate -Open`.
+
 ## [0.1.0] - 2026-10-02
 
 First alpha release.

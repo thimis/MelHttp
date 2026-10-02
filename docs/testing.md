@@ -30,7 +30,7 @@ the complete product.
 | G3 | MelCGI: programs see the request; malformed output becomes 502; fuzzers find nothing. |
 | G4 | The server is correct and safe: types, 404/405, traversal, ADS and case tricks, HEAD/304/Range/gzip. |
 | G5 | `melc build` + `melhttpd`: every file of the hand-made sites is served byte-identical. |
-| G6 | The Angular Material showcase runs from Malbolge: byte-identical crawl, deep links, Playwright browser tests. |
+| G6 | The Angular Material showcase runs from Malbolge: byte-identical crawl, deep links, Playwright browser tests; then the whole app again over the Malbolge transport with `-obfuscate-inject` (every page and script decoded by the service worker, deep links and routing still work). |
 | G7 | Cached serving is at least as fast as Go's `http.FileServer`. |
 | G8 | Docker: the image builds, containers are healthy, crawls pass against them. |
 | G9 | Every OS/arch builds; the VM and generator compile to WebAssembly. |
