@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/thimis/MelHttp/internal/obfs"
+	"github.com/thimis/MelHttp/internal/testutil"
 )
 
 func requireAssets(t *testing.T) {
@@ -82,7 +83,7 @@ func TestWasmInNode(t *testing.T) {
 	requireAssets(t)
 	node, err := exec.LookPath("node")
 	if err != nil {
-		t.Skip("node not installed")
+		testutil.Skip(t, "node not installed")
 	}
 	dir := t.TempDir()
 	body := []byte("decoded by Go-in-WebAssembly in Node ✓ \x00\xa9\xff")

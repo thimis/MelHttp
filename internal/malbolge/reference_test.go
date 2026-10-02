@@ -70,6 +70,9 @@ func TestReferenceDifferential(t *testing.T) {
 	r := rand.New(rand.NewPCG(1, 2))
 	var cases []reftest.Case
 	golden, _ := filepath.Glob(filepath.Join(reftest.Dir(), "..", "programs", "*.mb"))
+	if len(golden) != 6 {
+		t.Fatalf("found %d golden programs, want 6", len(golden))
+	}
 	for _, g := range golden {
 		src, err := os.ReadFile(g)
 		if err != nil {

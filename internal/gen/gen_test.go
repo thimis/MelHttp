@@ -181,8 +181,14 @@ func TestVerifyDetectsCorruption(t *testing.T) {
 	}
 }
 
+// corpusSize is how many files tools/mkcorpus generates into testdata/corpus.
+const corpusSize = 19
+
 func TestCorpus(t *testing.T) {
 	files, _ := filepath.Glob(filepath.Join("..", "..", "testdata", "corpus", "*"))
+	if len(files) != corpusSize {
+		t.Fatalf("testdata/corpus has %d files, want %d (regenerate: go run ./tools/mkcorpus)", len(files), corpusSize)
+	}
 	for _, f := range files {
 		data, err := os.ReadFile(f)
 		if err != nil {

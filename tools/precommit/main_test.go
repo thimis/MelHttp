@@ -7,13 +7,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/thimis/MelHttp/internal/testutil"
 )
 
 // repo creates a throwaway git repository.
 func repo(t *testing.T) string {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not installed")
+		testutil.Skip(t, "git not installed")
 	}
 	dir := t.TempDir()
 	for _, args := range [][]string{

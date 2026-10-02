@@ -39,7 +39,19 @@ build_binaries() {
     echo "    building the browser VM (melhttp.wasm)"
     (cd "$ROOT" && go generate ./internal/webvm) || return 1
   fi
-  (cd "$ROOT" && go build -o bin/ ./cmd/melc ./cmd/melhttpd)
+  (cd "$ROOT" && go build -o bin/ ./cmd/melc ./cmd/melhttpd ./tools/testreport)
+}
+
+REPORT="$BIN/testreport$EXE"
+
+# go_tests [-each] ARGS...: runs "go test -json ARGS" through tools/testreport
+# (readable results, every skipped and failed test listed). The report is
+# also saved in $LAST_REPORT for the final summary. Fails if any test failed.
+LAST_REPORT="$(mktemp 2>/dev/null || echo "/tmp/melhttp-report-$$")"
+go_tests() {
+  local each=
+  if [ "${1:-}" = -each ]; then each=-each; shift; fi
+  (cd "$ROOT" && set -o pipefail && go test -json "$@" | "$REPORT" $each | tee "$LAST_REPORT")
 }
 
 docker_running() {

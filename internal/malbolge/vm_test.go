@@ -54,20 +54,52 @@ func TestRunHelloWorld(t *testing.T) {
 	}
 }
 
+// goldenPrograms lists every program in testdata/programs with what it needs:
+// its expected output (.out) and, if it reads input, the input (.in). The
+// test fails if any listed file is missing or an unlisted program appears.
+var goldenPrograms = map[string]struct{ out, in bool }{
+	"hello.mb":           {out: true},
+	"cat-terminating.mb": {out: true, in: true},
+	"adder.mb":           {out: true, in: true},
+	"digital_root.mb":    {out: true, in: true},
+	"quine.mb":           {out: true},
+	"cat.mb":             {}, // never halts; TestRunCatEchoesThenEOFValue covers it
+}
+
 func TestRunGoldenFiles(t *testing.T) {
-	files, _ := filepath.Glob(filepath.Join("..", "..", "testdata", "programs", "*.mb"))
-	if len(files) == 0 {
-		t.Fatal("no golden programs")
+	dir := filepath.Join("..", "..", "testdata", "programs")
+	files, _ := filepath.Glob(filepath.Join(dir, "*.mb"))
+	if len(files) != len(goldenPrograms) {
+		t.Errorf("testdata/programs has %d programs, the test expects %d", len(files), len(goldenPrograms))
 	}
 	for _, f := range files {
-		base := strings.TrimSuffix(f, ".mb")
+		if _, ok := goldenPrograms[filepath.Base(f)]; !ok {
+			t.Errorf("%s is not listed in goldenPrograms", filepath.Base(f))
+		}
+	}
+	for name, need := range goldenPrograms {
+		base := filepath.Join(dir, strings.TrimSuffix(name, ".mb"))
+		if _, err := os.Stat(base + ".mb"); err != nil {
+			t.Errorf("missing %s", name)
+			continue
+		}
+		if !need.out {
+			continue
+		}
 		want, err := os.ReadFile(base + ".out")
 		if err != nil {
-			continue // programs without a golden output are exercised elsewhere
+			t.Errorf("missing expected output for %s: %v", name, err)
+			continue
 		}
-		input, _ := os.ReadFile(base + ".in")
-		t.Run(filepath.Base(f), func(t *testing.T) {
-			out, _, err := loadFile(t, filepath.Base(f)).RunBytes(context.Background(), input, Limits{MaxSteps: 1_000_000_000})
+		var input []byte
+		if need.in {
+			if input, err = os.ReadFile(base + ".in"); err != nil {
+				t.Errorf("missing input for %s: %v", name, err)
+				continue
+			}
+		}
+		t.Run(name, func(t *testing.T) {
+			out, _, err := loadFile(t, name).RunBytes(context.Background(), input, Limits{MaxSteps: 1_000_000_000})
 			if err != nil {
 				t.Fatal(err)
 			}

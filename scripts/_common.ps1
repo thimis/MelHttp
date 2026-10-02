@@ -31,11 +31,17 @@ function Ensure-Go {
 # if it fails.
 function Invoke-Checked([string]$File, [string[]]$Arguments) {
     Push-Location $Root
+    # Tools such as go and docker print progress on stderr; in Windows
+    # PowerShell that becomes an error record (fatal under "Stop") when output
+    # is redirected. Success is judged by the exit code alone.
+    $saved = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     try {
         & $File @Arguments
         if ($LASTEXITCODE -ne 0) { throw "$File $($Arguments -join ' ') failed (exit code $LASTEXITCODE)" }
     } finally {
         Pop-Location
+        $ErrorActionPreference = $saved
     }
 }
 
@@ -52,7 +58,34 @@ function Build-Binaries {
         Write-Host "    building the browser VM (melhttp.wasm)"
         Invoke-Checked go @('generate', './internal/webvm')
     }
-    Invoke-Checked go @('build', '-o', 'bin/', './cmd/melc', './cmd/melhttpd')
+    Invoke-Checked go @('build', '-o', 'bin/', './cmd/melc', './cmd/melhttpd', './tools/testreport')
+}
+
+$Report = Join-Path $Bin "testreport$Exe"
+
+# Invoke-GoTests runs "go test -json <args>" through tools/testreport, which
+# prints readable results and lists every skipped and failed test. It
+# returns the report's last lines (totals and skips) and throws on failure.
+function Invoke-GoTests([string[]]$GoArgs, [switch]$Each) {
+    Push-Location $Root
+    $saved = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    # Pipe text between the two programs as UTF-8 (Windows PowerShell's
+    # default is ASCII, which would garble non-ASCII test output).
+    $savedEncoding = $OutputEncoding
+    $OutputEncoding = New-Object System.Text.UTF8Encoding $false
+    try {
+        $reportArgs = @()
+        if ($Each) { $reportArgs += '-each' }
+        & go test -json @GoArgs | & $Report @reportArgs | Tee-Object -Variable lines | Out-Host
+        $code = $LASTEXITCODE
+    } finally {
+        Pop-Location
+        $ErrorActionPreference = $saved
+        $OutputEncoding = $savedEncoding
+    }
+    $script:LastReport = $lines
+    if ($code -ne 0) { throw "tests failed (details above)" }
 }
 
 function Test-Docker {

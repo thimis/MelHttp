@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/thimis/MelHttp/internal/crawl"
+	"github.com/thimis/MelHttp/internal/testutil"
 )
 
 // ---------------------------------------------------------------------------
@@ -91,8 +92,8 @@ func TestG2_GeneratorRoundTripsAnyBytes(t *testing.T) {
 		"newline.txt": []byte("line1\nline2\r\nline3\n"),
 	}
 	corpus, _ := filepath.Glob(filepath.Join(repoRoot, "testdata", "corpus", "*"))
-	if len(corpus) == 0 {
-		t.Error("testdata/corpus is empty; the real-world corpus must be present")
+	if len(corpus) != 19 {
+		t.Errorf("testdata/corpus has %d files, want the 19 that tools/mkcorpus generates", len(corpus))
 	}
 	for _, p := range corpus {
 		b, err := os.ReadFile(p)
@@ -392,7 +393,7 @@ func throughput(t *testing.T, url string, n, workers int, want []byte) float64 {
 
 func TestG8_Docker(t *testing.T) {
 	if os.Getenv("MELHTTP_DOCKER") != "1" {
-		t.Skip("set MELHTTP_DOCKER=1 to run the Docker goal (builds images, takes minutes)")
+		testutil.Skip(t, "set MELHTTP_DOCKER=1 to run the Docker goal (builds images, takes minutes)")
 	}
 	if !have("docker") {
 		t.Fatal("docker not found")
@@ -616,7 +617,7 @@ func isWindows() bool { return os.PathSeparator == '\\' }
 
 func TestG12_ACMECertificates(t *testing.T) {
 	if os.Getenv("MELHTTP_DOCKER") != "1" {
-		t.Skip("set MELHTTP_DOCKER=1 to run the ACME goal (starts the Pebble test CA in Docker)")
+		testutil.Skip(t, "set MELHTTP_DOCKER=1 to run the ACME goal (starts the Pebble test CA in Docker)")
 	}
 	requireBinaries(t)
 	tmp := t.TempDir()
