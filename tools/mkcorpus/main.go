@@ -27,8 +27,19 @@ func main() {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		fail(err)
 	}
+	files := corpusFiles()
+	for name, data := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
+			fail(err)
+		}
+	}
+	fmt.Printf("wrote %d files to %s\n", len(files), dir)
+}
+
+// corpusFiles returns the corpus; the same bytes on every call and every OS.
+func corpusFiles() map[string][]byte {
 	rng := rand.New(rand.NewPCG(2026, 10))
-	files := map[string][]byte{
+	return map[string][]byte{
 		"empty.txt":      {},
 		"one-byte.bin":   {0xA9},
 		"page.html":      []byte(page),
@@ -49,12 +60,6 @@ func main() {
 		"ascii-9k.txt":   asciiOfLen(rng, 9000),
 		"high-bytes.bin": highBytes(rng, 3000),
 	}
-	for name, data := range files {
-		if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
-			fail(err)
-		}
-	}
-	fmt.Printf("wrote %d files to %s\n", len(files), dir)
 }
 
 const prose = `MelHttp serves websites whose every byte is printed by a Malbolge program.

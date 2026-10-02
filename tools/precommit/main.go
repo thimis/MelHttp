@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,30 +22,48 @@ import (
 const hook = "#!/bin/sh\nexec go run ./tools/precommit\n"
 
 func main() {
-	all := flag.Bool("all", false, "check all tracked files instead of staged files")
-	install := flag.Bool("install", false, "install as .git/hooks/pre-commit")
-	flag.Parse()
+	os.Exit(run(os.Args[1:], ".", os.Stdout, os.Stderr))
+}
+
+// run checks the git repository in dir. Exit codes: 0 clean, 1 refused, 2 error.
+func run(args []string, dir string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("precommit", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	all := fs.Bool("all", false, "check all tracked files instead of staged files")
+	install := fs.Bool("install", false, "install as .git/hooks/pre-commit")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	git := func(args ...string) (string, error) { return gitOutput(dir, args...) }
 
 	if *install {
-		dir, err := gitOutput("rev-parse", "--git-path", "hooks")
+		hooks, err := git("rev-parse", "--git-path", "hooks")
 		if err != nil {
-			fail(err)
+			fmt.Fprintln(stderr, "precommit:", err)
+			return 2
 		}
-		p := filepath.Join(strings.TrimSpace(dir), "pre-commit")
+		p := strings.TrimSpace(hooks)
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(dir, p)
+		}
+		os.MkdirAll(p, 0o755)
+		p = filepath.Join(p, "pre-commit")
 		if err := os.WriteFile(p, []byte(hook), 0o755); err != nil {
-			fail(err)
+			fmt.Fprintln(stderr, "precommit:", err)
+			return 2
 		}
-		fmt.Println("installed", p)
-		return
+		fmt.Fprintln(stdout, "installed", p)
+		return 0
 	}
 
-	args := []string{"diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z"}
+	listArgs := []string{"diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z"}
 	if *all {
-		args = []string{"ls-files", "-z"}
+		listArgs = []string{"ls-files", "-z"}
 	}
-	out, err := gitOutput(args...)
+	out, err := git(listArgs...)
 	if err != nil {
-		fail(err)
+		fmt.Fprintln(stderr, "precommit:", err)
+		return 2
 	}
 	var problems []string
 	for _, f := range strings.Split(out, "\x00") {
@@ -57,10 +76,10 @@ func main() {
 		}
 		var data []byte
 		if *all {
-			data, err = os.ReadFile(f)
+			data, err = os.ReadFile(filepath.Join(dir, filepath.FromSlash(f)))
 		} else {
 			var s string
-			s, err = gitOutput("show", ":"+f)
+			s, err = git("show", ":"+f)
 			data = []byte(s)
 		}
 		if err != nil {
@@ -71,25 +90,22 @@ func main() {
 		}
 	}
 	if len(problems) > 0 {
-		fmt.Fprintln(os.Stderr, "precommit: refusing to commit:")
+		fmt.Fprintln(stderr, "precommit: refusing to commit:")
 		for _, p := range problems {
-			fmt.Fprintln(os.Stderr, "  "+p)
+			fmt.Fprintln(stderr, "  "+p)
 		}
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
-func gitOutput(args ...string) (string, error) {
+func gitOutput(dir string, args ...string) (string, error) {
 	var out, errb bytes.Buffer
 	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("git %s: %v: %s", strings.Join(args, " "), err, errb.String())
 	}
 	return out.String(), nil
-}
-
-func fail(err error) {
-	fmt.Fprintln(os.Stderr, "precommit:", err)
-	os.Exit(2)
 }

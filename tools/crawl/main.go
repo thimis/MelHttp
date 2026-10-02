@@ -22,17 +22,27 @@ import (
 )
 
 func main() {
-	base := flag.String("base", "http://localhost:8080", "server base URL")
-	src := flag.String("src", "", "source tree whose files must be served byte-for-byte")
-	load := flag.String("load", "", "load-test this URL instead of crawling")
-	n := flag.Int("n", 10000, "load test: number of requests")
-	c := flag.Int("c", 32, "load test / crawl: concurrency")
-	gzip := flag.Bool("gzip", false, "load test: send Accept-Encoding: gzip")
-	flag.Parse()
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
 
+func run(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("crawl", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	base := fs.String("base", "http://localhost:8080", "server base URL")
+	src := fs.String("src", "", "source tree whose files must be served byte-for-byte")
+	load := fs.String("load", "", "load-test this URL instead of crawling")
+	n := fs.Int("n", 10000, "load test: number of requests")
+	c := fs.Int("c", 32, "load test / crawl: concurrency")
+	gzip := fs.Bool("gzip", false, "load test: send Accept-Encoding: gzip")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
 	switch {
+	case *load != "" && (*n < 1 || *c < 1):
+		fmt.Fprintln(stderr, "crawl: -n and -c must be at least 1")
+		return 2
 	case *load != "":
-		os.Exit(loadTest(*load, *n, *c, *gzip))
+		return loadTest(stdout, *load, *n, *c, *gzip)
 	case *src != "":
 		skip := func(rel string) bool { // hand-written programs are not content
 			l := strings.ToLower(rel)
@@ -40,20 +50,20 @@ func main() {
 		}
 		rep, err := crawl.Site(context.Background(), *base, *src, crawl.Options{Concurrency: *c, Skip: skip})
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "crawl:", err)
-			os.Exit(2)
+			fmt.Fprintln(stderr, "crawl:", err)
+			return 2
 		}
-		fmt.Println(rep)
+		fmt.Fprintln(stdout, rep)
 		if !rep.OK() || rep.Checked == 0 {
-			os.Exit(1)
+			return 1
 		}
-	default:
-		flag.Usage()
-		os.Exit(2)
+		return 0
 	}
+	fs.Usage()
+	return 2
 }
 
-func loadTest(url string, n, workers int, gz bool) int {
+func loadTest(w io.Writer, url string, n, workers int, gz bool) int {
 	tr := &http.Transport{MaxIdleConnsPerHost: workers, DisableCompression: true}
 	client := &http.Client{Transport: tr, Timeout: 60 * time.Second}
 	lat := make([]time.Duration, n)
@@ -95,9 +105,9 @@ func loadTest(url string, n, workers int, gz bool) int {
 	total := time.Since(start)
 	sort.Slice(lat, func(i, j int) bool { return lat[i] < lat[j] })
 	pct := func(p float64) time.Duration { return lat[min(len(lat)-1, int(p*float64(len(lat))))] }
-	fmt.Printf("%d requests, %d workers, %v: %.0f req/s, %.1f MB/s\n", n, workers, total.Round(time.Millisecond),
+	fmt.Fprintf(w, "%d requests, %d workers, %v: %.0f req/s, %.1f MB/s\n", n, workers, total.Round(time.Millisecond),
 		float64(n)/total.Seconds(), float64(bytes.Load())/total.Seconds()/1e6)
-	fmt.Printf("latency p50 %v  p90 %v  p99 %v  max %v; failed %d\n", pct(.50), pct(.90), pct(.99), lat[len(lat)-1], failed.Load())
+	fmt.Fprintf(w, "latency p50 %v  p90 %v  p99 %v  max %v; failed %d\n", pct(.50), pct(.90), pct(.99), lat[len(lat)-1], failed.Load())
 	if failed.Load() > 0 {
 		return 1
 	}
