@@ -37,6 +37,9 @@ func init() {
 // Crz is Malbolge's "crazy" operation, as executed by the crz instruction:
 // a = [d] = Crz(a, [d]). It is not commutative; argument order matters.
 func Crz(a, d uint16) uint16 {
+	if faultMode == "crz-swap" {
+		a, d = d, a
+	}
 	lo := crzHalf[int(a%half)*half+int(d%half)]
 	hi := crzHalf[int(a/half)*half+int(d/half)]
 	return uint16(hi)*half + uint16(lo)

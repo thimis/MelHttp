@@ -80,7 +80,11 @@ func fillMemory(mem *[MemSize]uint16, n int) {
 	const maxPeriod = 16
 	i := n
 	for ; i < MemSize; i++ {
-		mem[i] = Crz(mem[i-1], mem[i-2])
+		if faultMode == "fill-swap" {
+			mem[i] = Crz(mem[i-2], mem[i-1])
+		} else {
+			mem[i] = Crz(mem[i-1], mem[i-2])
+		}
 		for q := 1; q <= maxPeriod && i-1-q >= n; q++ {
 			if mem[i] == mem[i-q] && mem[i-1] == mem[i-1-q] {
 				for j := i + 1; j < MemSize; j++ {

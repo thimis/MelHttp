@@ -41,6 +41,10 @@ the complete product.
 6. **Real files.** `testdata/corpus` holds HTML, JS, CSS, SVG, PNG, JPEG, GIF,
    wasm, UTF-16, BOM, CRLF, empty and boundary-sized files.
 7. **End to end.** Byte-identical crawls of whole sites (G5, G6, G8, G10).
+8. **Tests that test the tests.** With `-tags faults`, `MELHTTP_FAULT` compiles in one deliberate VM bug
+   (`crz-swap`, `no-encrypt`, `eof-zero`, `fill-swap`). `TestSuiteCatchesInjectedFaults` checks that the
+   unit tests fail for each one. Normal builds contain no fault code: the mode is a constant empty string.
+9. **Coverage.** At least 90% statement coverage for `internal/malbolge`, `internal/gen` and `internal/melcgi`.
 
 ## Fixtures
 

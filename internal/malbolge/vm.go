@@ -135,6 +135,8 @@ loop:
 			if ipos < ilen {
 				a = uint16(ibuf[ipos])
 				ipos++
+			} else if faultMode == "eof-zero" {
+				a = 0
 			} else {
 				a = MaxWord
 			}
@@ -144,7 +146,7 @@ loop:
 		}
 		// Encrypt the cell at c (the jump target, after a jump). The reference
 		// indexes out of bounds when that cell is outside 33..126; we leave it.
-		if v := mem[c]; v >= 33 && v <= 126 {
+		if v := mem[c]; v >= 33 && v <= 126 && faultMode != "no-encrypt" {
 			mem[c] = uint16(Xlat2[v-33])
 		}
 		if c == MaxWord {
