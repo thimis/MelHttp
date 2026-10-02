@@ -120,9 +120,14 @@ func (s *Server) Warm(ctx context.Context) WarmStats {
 	var st WarmStats
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+	var wasiEntries []*entry
 	for _, e := range s.index.all() {
+		if (e.kind == kindWASI || e.kind == kindWASIRaw) && s.wasi != nil {
+			wasiEntries = append(wasiEntries, e)
+			continue
+		}
 		if e.kind != kindProgram && e.kind != kindRaw {
-			continue // static files need no warm-up; WASI handlers always run per request
+			continue // static files need no warm-up
 		}
 		wg.Add(1)
 		go func() {
@@ -147,6 +152,14 @@ func (s *Server) Warm(ctx context.Context) WarmStats {
 		}()
 	}
 	wg.Wait()
+	// WASI handlers run per request, but compile them now so the first
+	// request does not pay for it.
+	for _, e := range wasiEntries {
+		if err := s.precompileWASI(ctx, e); err != nil {
+			st.Failed++
+			s.cfg.Logger.Warn("warm-up", "file", e.file, "error", err)
+		}
+	}
 	st.Duration = time.Since(start)
 	return st
 }

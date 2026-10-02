@@ -43,6 +43,9 @@ func TestWASIHandlers(t *testing.T) {
 	writeFile(t, root, "raw.txt.raw.wasi", wasiHandler(t))
 	writeFile(t, root, "notwasm.txt.wasi", []byte("nope"))
 	s, ts := newTestServer(t, root, Config{WASI: true, Timeout: 2 * time.Second, MaxOutput: 1 << 20})
+	if st := s.Warm(t.Context()); st.Failed != 4 { // 3 broken Malbolge fixtures + notwasm.txt.wasi
+		t.Fatalf("warm-up: %+v", st)
+	}
 
 	r := do(t, http.MethodPost, ts.URL+"/app/hello.txt", strings.NewReader("hi"))
 	if r.status != 200 || !strings.Contains(string(r.body), `Hello from WASI! method=POST script=/app/hello.txt https= body="hi" env=0`) ||
@@ -71,9 +74,6 @@ func TestWASIHandlers(t *testing.T) {
 		if r := get(t, ts.URL+p); r.status != 404 {
 			t.Errorf("%s = %d: module bytes must never be served", p, r.status)
 		}
-	}
-	if st := s.Warm(t.Context()); st.Failed != 3 { // the three broken Malbolge fixtures; WASI is skipped
-		t.Errorf("warm-up: %+v", st)
 	}
 }
 

@@ -172,3 +172,11 @@ type stderrBuf struct{ b []byte }
 
 func (s *stderrBuf) Write(p []byte) (int, error) { s.b = append(s.b, p...); return len(p), nil }
 func (s *stderrBuf) String() string              { return string(s.b) }
+
+// Precompile compiles the module ahead of its first request (melhttpd does
+// this during warm-up), so compilation time never counts against a request's
+// time limit.
+func (r *Runner) Precompile(ctx context.Context, key, version string, load func() ([]byte, error)) error {
+	_, err := r.compile(ctx, key, version, load)
+	return err
+}

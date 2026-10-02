@@ -121,9 +121,10 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 		log.Error("cannot listen", "addr", cfg.Addr, "error", err)
 		return 1
 	}
-	servers := []*http.Server{newServer(plain)}
+	plainServer := newServer(plain)
+	servers := []*http.Server{plainServer}
 	errc := make(chan error, 2)
-	go func() { errc <- servers[0].Serve(ln) }()
+	go func() { errc <- plainServer.Serve(ln) }()
 	var tlsAddr net.Addr
 	if tln != nil {
 		hs := newServer(srv)

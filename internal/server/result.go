@@ -312,14 +312,7 @@ func (s *Server) markDynamic(url, version string) {
 // unlike a Malbolge program, a WASI module can read the clock and random
 // numbers, so its output may change on every request.
 func (s *Server) produceWASI(ctx context.Context, e *entry, version string, in io.Reader, out *bytes.Buffer) (*result, error) {
-	load := func() ([]byte, error) {
-		code, err := fs.ReadFile(s.fsys, e.file)
-		if err == nil && !bytes.HasPrefix(code, []byte(wasi.Magic)) {
-			err = errors.New("not a WebAssembly module")
-		}
-		return code, err
-	}
-	err := s.wasi.Run(ctx, e.file, version, load, in, out, s.cfg.MaxOutput)
+	err := s.wasi.Run(ctx, e.file, version, s.wasiLoader(e), in, out, s.cfg.MaxOutput)
 	s.runs.Add(1)
 	if err != nil {
 		status := http.StatusInternalServerError
@@ -335,4 +328,22 @@ func (s *Server) produceWASI(ctx context.Context, e *entry, version string, in i
 		return nil, &httpError{http.StatusBadGateway, fmt.Errorf("%s: %w", e.file, err)}
 	}
 	return finish(&result{status: resp.Status, header: resp.Header, body: resp.Body, wasm: true, version: version}), nil
+}
+
+func (s *Server) wasiLoader(e *entry) func() ([]byte, error) {
+	return func() ([]byte, error) {
+		code, err := fs.ReadFile(s.fsys, e.file)
+		if err == nil && !bytes.HasPrefix(code, []byte(wasi.Magic)) {
+			err = errors.New("not a WebAssembly module")
+		}
+		return code, err
+	}
+}
+
+func (s *Server) precompileWASI(ctx context.Context, e *entry) error {
+	version, err := s.version(e)
+	if err != nil {
+		return err
+	}
+	return s.wasi.Precompile(ctx, e.file, version, s.wasiLoader(e))
 }

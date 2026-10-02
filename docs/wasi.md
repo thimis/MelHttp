@@ -62,7 +62,8 @@ logged with its stderr. Invalid MelCGI output produces a 502.
 
 Unlike Malbolge programs, WASI handlers are **never cached**. A module can read
 the clock and random numbers, so its output may change on every request.
-Modules are compiled once and recompiled when the file changes; a warm run
+Modules are compiled during warm-up, so compilation never counts against a
+request's time limit. They are recompiled when the file changes, and a warm run
 takes a few milliseconds.
 
 WASI support is **off by default**. Enable it with `-wasi` (`MELHTTP_WASI=true`).
