@@ -95,6 +95,9 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if e.kind != kindStatic && !s.decodeRequestBody(w, r) {
+		return
+	}
 	if e.kind != kindStatic && r.ContentLength > s.cfg.MaxBody {
 		http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
 		return

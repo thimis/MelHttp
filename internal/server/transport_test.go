@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -84,5 +85,37 @@ func TestTransportOffByDefault(t *testing.T) {
 	_, pg := newTestServer(t, root, Config{Playground: true})
 	if r := get(t, pg.URL+"/_melhttp/"); r.status != 200 || !strings.Contains(string(r.body), "Malbolge Playground") {
 		t.Errorf("playground: %d", r.status)
+	}
+}
+
+func TestTransportRequestBodies(t *testing.T) {
+	root, _ := site(t)
+	_, ts := newTestServer(t, root, Config{Obfuscate: true, MaxBody: 1000})
+	enc, err := obfs.Encode([]byte("secret-ish form data ✓"), 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := do(t, http.MethodPost, ts.URL+"/echo.txt", bytes.NewReader(enc),
+		obfs.RequestEncodingHeader, obfs.Program, "Content-Type", "text/plain")
+	if r.status != 200 || r.header.Get(obfs.RequestDecodedHeader) != "1" ||
+		!bytes.HasSuffix(r.body, []byte("\n\nsecret-ish form data ✓")) ||
+		bytes.Contains(r.body, []byte("HTTP_X_MALBOLGE_CONTENT_ENCODING")) {
+		t.Fatalf("decoded request: %d %v\n%s", r.status, r.header, r.body)
+	}
+	if !bytes.Contains(r.body, []byte("CONTENT_LENGTH="+strconv.Itoa(len("secret-ish form data ✓"))+"\n")) {
+		t.Errorf("CONTENT_LENGTH should be the decoded size:\n%s", r.body)
+	}
+	if bad := do(t, http.MethodPost, ts.URL+"/echo.txt", strings.NewReader("not programs"), obfs.RequestEncodingHeader, obfs.Program); bad.status != 400 {
+		t.Errorf("invalid container: %d", bad.status)
+	}
+	big, _ := obfs.Encode(bytes.Repeat([]byte("x"), 2000), 1)
+	if r := do(t, http.MethodPost, ts.URL+"/echo.txt", bytes.NewReader(big), obfs.RequestEncodingHeader, obfs.Program); r.status != 413 {
+		t.Errorf("decoded body over -max-body: %d", r.status)
+	}
+	// Without -obfuscate the header means nothing: the body passes through as is.
+	_, plain := newTestServer(t, root, Config{})
+	p := do(t, http.MethodPost, plain.URL+"/echo.txt", strings.NewReader("raw"), obfs.RequestEncodingHeader, obfs.Program)
+	if !bytes.HasSuffix(p.body, []byte("\n\nraw")) {
+		t.Errorf("disabled transport touched the body: %q", p.body)
 	}
 }

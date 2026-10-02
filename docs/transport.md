@@ -32,6 +32,19 @@ Add one line to the pages that should opt in:
    runs the programs, and hands the page the original bytes. It adds
    `X-Malbolge-Decoded: service-worker` so you can see what happened.
 
+**Request bodies too.** For POST, PUT and other requests with a body, the
+worker compiles the body into Malbolge in the browser (the generator also runs
+in WebAssembly) and sends it with `X-Malbolge-Content-Encoding: program`.
+melhttpd decodes it before the program sees it, and replies with
+`X-Malbolge-Request-Decoded: 1`. Its limits:
+
+- the encoded body may be up to 64× `-max-body`;
+- decoding has a step budget;
+- the decoded body must still fit `-max-body`.
+
+The generator's tables are built in the background when the worker starts,
+so the first submission isn't slow.
+
 Service workers need a secure context: HTTPS, or `localhost`/`127.0.0.1` for
 testing.
 

@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"compress/gzip"
+	"io"
 	"math/rand/v2"
 	"net/http"
 	"strconv"
@@ -68,8 +69,7 @@ func encode(body []byte, seed uint64) (*encoded, error) {
 
 // wantsProgram reports whether the client asked for the Malbolge transport.
 func (s *Server) wantsProgram(r *http.Request) bool {
-	return s.cfg.Obfuscate && r.Header.Get(obfs.AcceptHeader) == obfs.Program &&
-		(r.Method == http.MethodGet || r.Method == http.MethodHead)
+	return s.cfg.Obfuscate && r.Header.Get(obfs.AcceptHeader) == obfs.Program
 }
 
 // writeProgram sends a 200 response body as Malbolge programs.
@@ -97,4 +97,33 @@ func (s *Server) writeProgram(w http.ResponseWriter, r *http.Request, url string
 	if r.Method != http.MethodHead {
 		w.Write(body)
 	}
+}
+
+// decodeRequestBody replaces a request body sent as Malbolge programs with
+// the bytes the programs print. Encoded bodies may be up to 64× MaxBody; the
+// decoded body must still fit MaxBody.
+func (s *Server) decodeRequestBody(w http.ResponseWriter, r *http.Request) bool {
+	if !s.cfg.Obfuscate || r.Header.Get(obfs.RequestEncodingHeader) != obfs.Program || r.Body == nil {
+		return true
+	}
+	container, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 64*s.cfg.MaxBody))
+	if err != nil {
+		http.Error(w, "encoded request body too large", http.StatusRequestEntityTooLarge)
+		return false
+	}
+	body, err := obfs.Decode(r.Context(), container, 0)
+	if err != nil {
+		http.Error(w, "request body is not valid Malbolge transport", http.StatusBadRequest)
+		return false
+	}
+	if int64(len(body)) > s.cfg.MaxBody {
+		http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+		return false
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Del(obfs.RequestEncodingHeader)
+	r.Header.Del("Content-Length")
+	w.Header().Set(obfs.RequestDecodedHeader, "1")
+	return true
 }

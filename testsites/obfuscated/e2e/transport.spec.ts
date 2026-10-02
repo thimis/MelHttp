@@ -27,6 +27,16 @@ test("pages travel as Malbolge and are decoded by the service worker", async ({ 
   expect(wire).not.toContain("About the transport");
   expect(wire).toMatch(/^[!-~\n]+$/); // only Malbolge program text
 
+  // Request bodies travel as Malbolge too: the server decodes them before the program runs.
+  const posted = await page.evaluate(async () => {
+    const r = await fetch("/echo.txt", { method: "POST", body: "form data via Malbolge ✓", headers: { "Content-Type": "text/plain" } });
+    return { decodedReq: r.headers.get("X-Malbolge-Request-Decoded"), decodedRes: r.headers.get("X-Malbolge-Decoded"), text: await r.text() };
+  });
+  expect(posted.decodedReq).toBe("1");
+  expect(posted.decodedRes).toBe("service-worker");
+  expect(posted.text).toContain("REQUEST_METHOD=POST");
+  expect(posted.text.endsWith("form data via Malbolge ✓")).toBe(true);
+
   // Navigations and binary subresources are decoded too.
   await page.goto("/about.html");
   await expect(page.locator("h1")).toHaveText("About the transport");

@@ -22,7 +22,11 @@ const (
 	AcceptHeader      = "X-Malbolge-Accept"       // request: "program"
 	EncodingHeader    = "X-Malbolge-Encoding"     // response: "program"
 	ContentTypeHeader = "X-Malbolge-Content-Type" // response: the decoded body's type
-	Program           = "program"
+	// RequestEncodingHeader marks a request body sent as programs ("program").
+	RequestEncodingHeader = "X-Malbolge-Content-Encoding"
+	// RequestDecodedHeader tells the client its request body was decoded.
+	RequestDecodedHeader = "X-Malbolge-Request-Decoded"
+	Program              = "program"
 	// MediaType is the Content-Type of an encoded body.
 	MediaType = "text/x-malbolge; charset=us-ascii"
 )
