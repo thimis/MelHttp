@@ -20,6 +20,9 @@ import (
 type Config struct {
 	Addr        string
 	MetricsAddr string // private listener for /metrics (empty = off)
+	LogFile     string // append logs to this file instead of stderr
+	Service     string // Windows service action: install, uninstall, start, stop
+	ServiceName string
 	LogFormat   string // text or json
 	Healthcheck bool   // probe a running server and exit
 	Version     bool
@@ -71,6 +74,9 @@ func Parse(args []string, getenv func(string) string, output io.Writer) (Config,
 	fs.BoolVar(&c.Server.AllowSensitiveHeaders, "allow-sensitive-headers", false, "pass Cookie and Authorization to programs")
 	fs.StringVar(&c.LogFormat, "log-format", "text", "log format: text or json")
 	fs.StringVar(&c.MetricsAddr, "metrics-addr", "", "serve Prometheus metrics at /metrics on this private `address` (e.g. 127.0.0.1:9090)")
+	fs.StringVar(&c.LogFile, "log-file", "", "append logs to this `file` instead of stderr (services have no console)")
+	fs.StringVar(&c.Service, "service", "", "Windows: `install`, uninstall, start or stop the melhttpd service (other flags are stored for the service)")
+	fs.StringVar(&c.ServiceName, "service-name", "melhttpd", "Windows service `name`")
 	fs.BoolVar(&c.Healthcheck, "healthcheck", false, "check that a server on -addr is healthy, then exit (for Docker)")
 	fs.BoolVar(&c.Version, "version", false, "print the version and exit")
 	fs.StringVar(&c.TLS.Addr, "tls-addr", ":8443", "HTTPS listen `address` (when HTTPS is enabled)")

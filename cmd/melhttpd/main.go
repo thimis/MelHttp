@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -31,6 +32,18 @@ import (
 var version = "dev"
 
 func main() {
+	if isWindowsService() {
+		name := "melhttpd"
+		if c, err := config.Parse(os.Args[1:], os.Getenv, io.Discard); err == nil {
+			name = c.ServiceName
+		}
+		if err := runAsService(name, func(ctx context.Context) int {
+			return run(ctx, os.Args[1:], os.Getenv, io.Discard, io.Discard, nil)
+		}); err != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	code := run(ctx, os.Args[1:], os.Getenv, os.Stdout, os.Stderr, nil)
 	stop()
@@ -54,6 +67,29 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 	}
 	if cfg.Healthcheck {
 		return healthcheck(ctx, cfg.HealthcheckURL(), stderr)
+	}
+	if cfg.Service != "" {
+		stored := args
+		if cfg.Service == "install" && cfg.LogFile == "" {
+			if exe, err := os.Executable(); err == nil {
+				stored = append(stored, "-log-file", filepath.Join(filepath.Dir(exe), cfg.ServiceName+".log"))
+			}
+		}
+		if err := controlService(cfg.Service, cfg.ServiceName, stored); err != nil {
+			fmt.Fprintln(stderr, "melhttpd:", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "melhttpd: service %q: %s done\n", cfg.ServiceName, cfg.Service)
+		return 0
+	}
+	if cfg.LogFile != "" {
+		f, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o640)
+		if err != nil {
+			fmt.Fprintln(stderr, "melhttpd:", err)
+			return 1
+		}
+		defer f.Close()
+		stderr = f
 	}
 
 	var handler slog.Handler = slog.NewTextHandler(stderr, nil)

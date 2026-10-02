@@ -33,6 +33,9 @@ jobs:
       - run: go test ./...
       - name: secret / hygiene check
         run: go run ./tools/precommit -all
+      - name: Windows service goal (install, start, serve, stop, remove)
+        if: runner.os == 'Windows'
+        run: go test -tags acceptance -run G15 -v ./acceptance
       - name: smoke test (build a site, serve it, crawl it)
         run: |
           go build -o bin/ ./cmd/melc ./cmd/melhttpd
