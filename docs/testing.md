@@ -3,9 +3,9 @@
 The easiest way is the scripts, which build first and print a pass/fail summary:
 
 ```bash
-scripts/test.sh --quick     # or .scripts	est.ps1 -Quick   build + unit tests + smoke test
-scripts/test.sh             # or .scripts	est.ps1          + acceptance goals without Docker
-scripts/test.sh --full      # or .scripts	est.ps1 -Full    + Docker/ACME goals, reference interpreter, race detector
+scripts/test.sh --quick     # or .\scripts\test.ps1 -Quick   build + unit tests + smoke test
+scripts/test.sh             # or .\scripts\test.ps1          + acceptance goals without Docker
+scripts/test.sh --full      # or .\scripts\test.ps1 -Full    + Docker/ACME goals, reference interpreter, race detector
 ```
 
 Or run the pieces by hand:
