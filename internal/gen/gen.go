@@ -31,6 +31,8 @@ type Options struct {
 	// LineWidth wraps the source every LineWidth characters (default 128,
 	// negative disables). Whitespace is ignored by Malbolge.
 	LineWidth int
+
+	noSweep bool // tests: use tape chunks instead of sweep chunks
 }
 
 // MinCells is the smallest allowed Options.MaxCells.
@@ -150,10 +152,11 @@ func Verify(ctx context.Context, chunks [][]byte, want []byte) error {
 }
 
 type encoder struct {
-	opt  Options
-	tape *tapeLayout
-	rng  *rand.Rand
-	buf  [16]uint8 // scratch for depth-first searches
+	opt   Options
+	tape  *tapeLayout
+	rng   *rand.Rand
+	buf   [16]uint8 // scratch for depth-first searches
+	sweep sweepSearch
 }
 
 // lag1MinRun is the shortest run of lag-1-printable bytes worth its own
@@ -188,7 +191,14 @@ func (e *encoder) compileSegment(data []byte) [][]byte {
 			}
 			continue
 		}
-		n, src := e.tapeChunkFit(l1, data)
+		var n int
+		var src []byte
+		if !e.opt.noSweep {
+			n, src = e.sweepChunk(data, e.longRunAhead(l1, data))
+		}
+		if n == 0 {
+			n, src = e.tapeChunkFit(l1, data) // proven fallback
+		}
 		chunks = append(chunks, src)
 		if data = data[n:]; len(data) == 0 {
 			return chunks
@@ -200,13 +210,7 @@ func (e *encoder) compileSegment(data []byte) [][]byte {
 // tape to the smallest size that still holds what the chunk consumed.
 func (e *encoder) tapeChunkFit(l1 *lag1Tables, data []byte) (int, []byte) {
 	tl := e.tape
-	stop := func(i int) bool {
-		if i == 0 {
-			return false
-		}
-		rest := data[i:]
-		return lag1Run(l1, rest[:min(len(rest), lag1MinRun)]) >= lag1MinRun
-	}
+	stop := e.longRunAhead(l1, data)
 	tmax := min(tapeMax, (e.opt.MaxCells-tapeOverhead)/2)
 	// Start from an estimate (about 20 content cells per byte) and double.
 	t := min(tmax, max(minTape, 24*len(data)))
@@ -268,4 +272,16 @@ func (e *encoder) assemble(ops []malbolge.Op) []byte {
 		emit(op)
 	}
 	return append(src, '\n')
+}
+
+// longRunAhead returns a stop function for data: true at i > 0 when a run of
+// lag1MinRun printable bytes starts there, which a lag-1 chunk prints cheaper.
+func (e *encoder) longRunAhead(l1 *lag1Tables, data []byte) func(i int) bool {
+	return func(i int) bool {
+		if i == 0 {
+			return false
+		}
+		rest := data[i:]
+		return lag1Run(l1, rest[:min(len(rest), lag1MinRun)]) >= lag1MinRun
+	}
 }

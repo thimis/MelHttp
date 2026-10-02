@@ -63,9 +63,49 @@ same too. A reach table then records, for every stream index, which bytes are
 printable within 5 moves after a `*` there.
 
 Cost: about **31–38 cells per byte** (content plus the tape it consumes).
+Tape chunks are now the proven **fallback**; sweep chunks below do the same job
+about four times more compactly.
 
-Data is split per chunk: runs of lag-1-printable bytes of at least 256 bytes
-get cheap lag-1 chunks, and everything else goes to tape chunks.
+## Sweep chunks (everything else, by default)
+
+A tape chunk throws its tape away after one pass, and pays a tape cell for
+every content cell. Sweep chunks reuse the region instead:
+
+```
+prefix | head: lag-1 moves | k nops | prev | j | sweep moves (+ forced j) | v
+```
+
+1. The **head** prints the leading lag-1-printable bytes in cheap lag-1 mode,
+   padded with filler moves to at least 320 cells. Its trail is the
+   **region**: the cells from `sStar` (34) up to the cell before the `j`.
+2. The `j` moves `d` to `sStar`, as in a tape chunk. The cell before that `j`,
+   the **anchor**, still holds `sStar − 1`.
+3. The content runs in **sweep mode**. `d` walks through the region; whenever
+   it reaches the anchor, a forced `j` (one extra cell) rewinds it to `sStar`.
+   The region is therefore read again and again.
+4. Every `*` or `p` overwrites the region cell it just read with its result. So
+   each sweep leaves the region holding values derived from the last one, and
+   the values get richer with every pass.
+5. Per byte, a breadth-first search over `(a, d)` states (depth ≤ 8, each state
+   visited once) finds the shortest move sequence. If the bytes ahead can't
+   reach the target quickly, it skips forward with nops.
+
+The region's starting contents are read from the real VM: the head is
+executed with a `Machine`, so the model cannot drift from Malbolge. A sweep
+chunk runs until the 59049-cell limit, printing any bytes. It stops early only
+when a long ASCII run begins, which a lag-1 chunk prints more cheaply.
+
+Cost: about **8–10 cells per byte** for binary data and UTF-8 text, close to
+ASCII prices and about 4× smaller than tape chunks.
+
+Sweep chunks have no static completeness proof, because their region depends
+on the content. If one can't print a byte, the encoder falls back to a tape
+chunk, which has a proof. **Every input is still compilable.** The fallback is
+kept tested with `Options.noSweep`.
+
+**Chunk selection.** A run of at least 256 lag-1-printable bytes gets a lag-1
+chunk (~7.3 cells/byte). Everything else gets a sweep chunk, and a tape chunk
+only as the fallback.
 
 ### Why not the fill region?
 
@@ -81,12 +121,15 @@ values**. Reading it reaches just 64 byte values.
 | Lag-1 tables reach all 201 lag-1-printable bytes from every reset state; worst case 67 cells | `TestLag1Completeness` |
 | From every stream index, every one of the 256 bytes is reachable; worst case 362 cells, average fallback 19 | `TestTapeCompleteness` |
 | The tape layout (d, a, every stream value) matches the real VM for many tape lengths | `TestTapeOnRealVM` |
+| Sweep chunks rewind correctly on the real VM (e.g. 3000 binary bytes over 74 sweeps) | `TestSweepRegionMatchesVM` |
+| The proven tape fallback still round-trips | `TestTapeFallbackStillWorks` |
 | Generated programs print exactly their input (VM) | `TestRoundTrip`, `TestCorpus`, `FuzzRoundTrip` |
 | Generated programs print exactly their input on the original 1998 C interpreter | `TestReferenceRunsGeneratedPrograms` (`-tags reference`) |
 | Every `melc` output is run and compared before it is written | `gen.Verify` in `melc gen` / `melc build` |
 
-The completeness tests show that from every state, every byte can be printed
-within a bounded number of cells. **Every input is therefore compilable.**
+The completeness tests show that lag-1 and tape chunks can print every byte from every
+state, within a bounded number of cells. Sweep chunks fall back to tape chunks, so
+**every input is compilable**.
 
 ## Chunks
 
@@ -101,8 +144,9 @@ output does not depend on the number of workers.
 | Input | Cells per byte | Compile speed |
 |---|---|---|
 | ASCII HTML/JS/CSS | ~7.1–7.6 | ~12 MB/s |
-| Random binary (fonts, images) | ~37 | ~5.5 MB/s |
-| Small UTF-8 text files | ~35 (tape chunks) | — |
+| Random binary (fonts, images) | ~8.5 (sweep chunks; tape chunks were ~37) | ~0.9 MB/s |
+| UTF-8 text with accents, UTF-16, BOM files | ~8–11 | — |
+| Real corpus (PNG, JPEG, GIF, wasm, JSON, SVG, …) | 7.3–10.9 | — |
 
 Loading a program (including the memory fill) takes about 22 µs.
 

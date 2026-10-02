@@ -22,8 +22,8 @@ concurrent clients (`go run ./tools/crawl -load`).
 | VM speed | ~480 million Malbolge instructions/s per core |
 | Program load (parse + 59049-cell memory fill) | ~22 µs |
 | Compile ASCII text | ~12 MB/s, ~7.1–7.6 cells/byte |
-| Compile binary data | ~5.5 MB/s, ~37 cells/byte |
-| `melc build` of the Angular showcase (1.34 MB, 20 files) | 0.3 s → 727 programs, 16 MB of Malbolge (11.9×) |
+| Compile binary data | ~0.9 MB/s, ~8.5 cells/byte (sweep chunks) |
+| `melc build` of the Angular showcase (1.34 MB, 20 files) | 0.3 s → 639 programs, 10.1 MB of Malbolge (7.5×) |
 | Warm-up of the Angular showcase | 15.9 M instructions, **74 ms** |
 | `GET /` (8.8 KB index.html), cached | **40 800 req/s**, p50 0.55 ms, p99 2.2 ms |
 | `GET /main-*.js` (270 KB) with gzip | 29 100 req/s, p99 2.9 ms |

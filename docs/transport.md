@@ -63,7 +63,7 @@ D'`A@?>=<;:9876543210/.-,+*)('&%$#"!~}|{)yxwpun4lTj0Qmled*ba`&dcbaZYX|?[=<XWPtTM
   sets up the machine), so encoded responses are easy to recognise as MelHttp traffic.
   Again: obfuscation, not secrecy.
 
-Encoded bodies are 7–40× larger than the original. gzip, applied when the
+Encoded bodies are about 7–11× larger than the original. gzip, applied when the
 browser accepts it, reduces that substantially. Decoding takes milliseconds:
 the Angular showcase's 270 KB main bundle is about 2.2 M instructions.
 

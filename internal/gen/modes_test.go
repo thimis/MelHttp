@@ -150,3 +150,55 @@ func TestASCIIUsesLag1Chunks(t *testing.T) {
 		t.Errorf("ASCII costs %.2f cells/byte; lag-1 chunks should give < 10", ratio)
 	}
 }
+
+// TestTapeFallbackStillWorks forces the proven tape chunks that back up
+// sweep chunks, so the fallback stays covered.
+func TestTapeFallbackStillWorks(t *testing.T) {
+	data := []byte(strings.Repeat("tape fallback: \x00\xa9\xff Ünïcødé ✓ ", 200))
+	chunks := roundTrip(t, data, Options{noSweep: true})
+	ratio := float64(cells(chunks)) / float64(len(data))
+	sweep := roundTrip(t, data, Options{})
+	t.Logf("tape chunks %.1f cells/byte; sweep chunks %.1f cells/byte", ratio, float64(cells(sweep))/float64(len(data)))
+	if cells(sweep) >= cells(chunks) {
+		t.Error("sweep chunks should be smaller than tape chunks")
+	}
+}
+
+// TestSweepRegionMatchesVM runs a sweep chunk step by step on the real VM:
+// every forced 'j' must land d back on the region start.
+func TestSweepRegionMatchesVM(t *testing.T) {
+	tl, _ := getTape()
+	e := &encoder{tape: tl}
+	e.opt, _ = Options{}.withDefaults()
+	data := make([]byte, 3000)
+	for i := range data {
+		data[i] = byte(i*7 + i/3)
+	}
+	n, src := e.sweepChunk(data, func(int) bool { return false })
+	if n == 0 {
+		t.Fatal("sweep chunk made no progress")
+	}
+	p, err := malbolge.Load(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []byte
+	m := p.NewMachine(nil, byteSink{&out})
+	rewinds := 0
+	for !m.Halted {
+		if m.Op() == malbolge.OpMovD && m.Mem[m.D] == uint16(tl.sStar-1) {
+			rewinds++
+		}
+		if err := m.Step(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if string(out) != string(data[:n]) || rewinds < 3 {
+		t.Fatalf("printed %d bytes (want %d), %d rewinds", len(out), n, rewinds)
+	}
+	t.Logf("%d bytes in one chunk with %d region sweeps", n, rewinds-1)
+}
+
+type byteSink struct{ b *[]byte }
+
+func (s byteSink) WriteByte(c byte) error { *s.b = append(*s.b, c); return nil }

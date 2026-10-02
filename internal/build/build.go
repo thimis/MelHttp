@@ -32,7 +32,7 @@ import (
 
 // GeneratorVersion changes whenever generated code changes, invalidating the
 // incremental-build manifest.
-const GeneratorVersion = "gen-2"
+const GeneratorVersion = "gen-3"
 
 // Marker marks a directory as melc output; only such directories are ever
 // replaced by a build.
