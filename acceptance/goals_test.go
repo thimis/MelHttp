@@ -290,6 +290,7 @@ func isProgramPath(rel string) bool {
 // assertNoPlainContent checks the "everything Malbolge" rule: a built site
 // contains only Malbolge programs (plus melhttp.json).
 func assertNoPlainContent(t *testing.T, root string) {
+	// Dotfiles (build marker, manifest) are never served.
 	t.Helper()
 	filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
@@ -297,6 +298,9 @@ func assertNoPlainContent(t *testing.T, root string) {
 		}
 		rel, _ := filepath.Rel(root, p)
 		rel = filepath.ToSlash(rel)
+		if strings.HasPrefix(filepath.Base(p), ".") {
+			return nil
+		}
 		if rel != "melhttp.json" && !isProgramPath(rel) {
 			t.Errorf("built site contains non-Malbolge file %s", rel)
 		}

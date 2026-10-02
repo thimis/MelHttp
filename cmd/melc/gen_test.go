@@ -114,3 +114,33 @@ func TestGenErrors(t *testing.T) {
 		t.Errorf("missing file: code %d", code)
 	}
 }
+
+func TestBuildCommand(t *testing.T) {
+	src := t.TempDir()
+	os.WriteFile(filepath.Join(src, "index.html"), []byte("<h1>built</h1>"), 0o644)
+	out := filepath.Join(t.TempDir(), "site")
+	stdout, errOut, code := melc(t, "", "build", "-o", out, "--spa=true", src)
+	if code != exitOK || !strings.Contains(stdout, "1 files") {
+		t.Fatalf("code %d out %q err %q", code, stdout, errOut)
+	}
+	resp, err := melcgi.ParseResponse(runSet(t, filepath.Join(out, "index.html.mb")))
+	if err != nil || string(resp.Body) != "<h1>built</h1>" {
+		t.Fatalf("built page: %v", err)
+	}
+	cfg, _ := os.ReadFile(filepath.Join(out, "melhttp.json"))
+	if !strings.Contains(string(cfg), `"spa": true`) {
+		t.Errorf("melhttp.json = %s", cfg)
+	}
+	if _, _, code := melc(t, "", "build", "--preset", "cobol", src); code != exitUsage {
+		t.Errorf("unknown preset: code %d", code)
+	}
+	if _, _, code := melc(t, "", "build", "--preset", "vite", "-o", out, src); code != exitError {
+		t.Errorf("vite preset without dist: code %d", code)
+	}
+	if _, _, code := melc(t, "", "build", "--spa=maybe", "-o", out, src); code != exitUsage {
+		t.Errorf("bad --spa: code %d", code)
+	}
+	if _, _, code := melc(t, "", "build"); code != exitUsage {
+		t.Errorf("no args: code %d", code)
+	}
+}
