@@ -89,7 +89,7 @@ case "$(echo "$SITE" | tr '[:upper:]' '[:lower:]')" in
   vue)     SRC="$ROOT/testsites/vue-vite"; PRESET=vite; FRAMEWORK=1 ;;
   transport|obfuscated)
     SRC="$ROOT/testsites/obfuscated/site"; EXTRA+=(-obfuscate -playground)
-    HINT="Reload the page once; then pages travel as Malbolge (DevTools > Network shows it). Playground: /_melhttp/playground.html" ;;
+    HINT="Reload the page once; then pages travel as Malbolge (how to see it: docs/transport.md, 'Seeing it in your browser'). Playground: /_melhttp/playground.html" ;;
   wasi)
     SRC="$ROOT/testsites/wasi"; EXTRA+=(-wasi)
     HINT="Open /hello.html: a Go program compiled to WebAssembly answers each request."
@@ -115,7 +115,7 @@ if [ "$HTTPS" = 1 ]; then
 fi
 if [ "$OBFUSCATE" = 1 ] && [[ " ${EXTRA[*]-} " != *" -obfuscate "* ]]; then
   SERVER_ARGS+=(-obfuscate-inject)
-  HINT="Malbolge transport is on: reload the page once, then every page and file travels as Malbolge (DevTools > Network: responses carry X-Malbolge-Decoded). Use the http:// address: browsers refuse service workers on self-signed HTTPS."
+  HINT="Malbolge transport is on: reload the page once, then every page and file travels as Malbolge and your browser decodes it. How to see it (Chrome, Edge, Firefox): docs/transport.md, 'Seeing it in your browser'. Use the http:// address: browsers refuse service workers on self-signed HTTPS."
 fi
 if [ "$METRICS" = 1 ]; then
   SERVER_ARGS+=(-metrics-addr 127.0.0.1:9090)

@@ -63,6 +63,43 @@ so the first submission isn't slow.
 Service workers need a secure context: HTTPS, or `localhost`/`127.0.0.1` for
 testing.
 
+## Seeing it in your browser
+
+The page always gets the decoded file, because the browser can only run and
+display real HTML and JavaScript. That includes a file you open directly in
+the address bar. The Malbolge only exists between the server and the service
+worker. To see both sides:
+
+**Chrome and Edge.** Open DevTools → Network and reload the page.
+- *Decoded side:* rows whose Size column says `(ServiceWorker)` are what the
+  page received. Their response headers include `X-Malbolge-Decoded:
+  service-worker`.
+- *Wire side:* each of those files has a second row with a ⚙ icon: the
+  worker's own request. Its response is `text/x-malbolge`.
+
+**Firefox.** The page's Network tab doesn't show the worker's requests.
+- *Decoded side:* in the page's Network tab, the Transferred column says
+  `service worker`, and responses carry `X-Malbolge-Decoded: service-worker`.
+- *Wire side:* open `about:debugging#/runtime/this-firefox`. Under **Service
+  Workers**, find your site and click **Inspect**. In that window's Network
+  tab, reload the page in the other tab. The worker's requests carry
+  `X-Malbolge-Accept: program` and get `text/x-malbolge` responses.
+- Private windows don't run service workers.
+
+**Any browser.** A hard reload (Ctrl+F5 or Ctrl+Shift+R) skips the service
+worker, so that one load is plain. A normal reload brings the transport back.
+
+**From a terminal:**
+
+```bash
+curl -H "X-Malbolge-Accept: program" http://localhost:8080/          # curl.exe in PowerShell
+```
+
+A client that doesn't ask for Malbolge, such as `curl` without that header or
+the first visit before the worker is installed, gets the plain file. The
+transport hides traffic from observers of the connection, not from someone
+requesting files directly.
+
 ## On the wire
 
 ```http

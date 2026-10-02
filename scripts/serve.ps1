@@ -104,7 +104,7 @@ switch ($Site.ToLower()) {
     'vue'       { $src = 'testsites\vue-vite'; $preset = 'vite'; $isFramework = $true }
     { $_ -in 'transport', 'obfuscated' } {
         $src = 'testsites\obfuscated\site'; $extra += '-obfuscate', '-playground'
-        $hint = "Reload the page once; then pages travel as Malbolge (DevTools > Network shows it). Playground: /_melhttp/playground.html"
+        $hint = "Reload the page once; then pages travel as Malbolge (how to see it: docs\transport.md, 'Seeing it in your browser'). Playground: /_melhttp/playground.html"
     }
     'wasi' {
         $src = 'testsites\wasi'; $extra += '-wasi'
@@ -145,8 +145,8 @@ if ($Https) {
 if ($Obfuscate -and $extra -notcontains '-obfuscate') {
     $serverArgs += '-obfuscate-inject'
     $hint = "Malbolge transport is on: reload the page once, then every page and file travels as Malbolge " +
-            "(DevTools > Network: responses carry X-Malbolge-Decoded). Use the http:// address: " +
-            "browsers refuse service workers on self-signed HTTPS."
+            "and your browser decodes it. How to see it (Chrome, Edge, Firefox): docs\transport.md, " +
+            "'Seeing it in your browser'. Use the http:// address: browsers refuse service workers on self-signed HTTPS."
 }
 if ($Metrics) {
     $serverArgs += '-metrics-addr', '127.0.0.1:9090'

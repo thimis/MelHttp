@@ -38,7 +38,7 @@ The first run installs the app's packages, builds it, compiles every file to Mal
 
 - **Malbolge corner** (in the app's menu): see the Malbolge program behind the page.
 - **Malbolge transport:** add `-Obfuscate` (`--obfuscate`) to the serve command. With Docker, run `docker compose up -d --wait angular-transport` and open http://localhost:8088; stop it with `docker compose --profile transport down`.
-  Reload the page once. From then on, every file reaches the browser as a Malbolge program and is decoded there. In DevTools → Network, the rows with a ⚙ icon show the Malbolge on the wire.
+  Reload the page once. From then on, every file reaches the browser as a Malbolge program and is decoded there, so the browser still shows normal pages. [How to see the Malbolge in Chrome, Edge and Firefox](docs/transport.md#seeing-it-in-your-browser).
 
 ## How it works
 
