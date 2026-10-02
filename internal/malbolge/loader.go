@@ -67,8 +67,27 @@ func Load(src []byte) (*Program, error) {
 	if p.n < 2 {
 		return nil, &LoadError{Reason: "program too short (need at least 2 instructions)"}
 	}
-	for i := p.n; i < MemSize; i++ {
-		p.mem[i] = Crz(p.mem[i-1], p.mem[i-2])
-	}
+	fillMemory(&p.mem, p.n)
 	return p, nil
+}
+
+// fillMemory sets mem[i] = crz(mem[i-1], mem[i-2]) for i >= n. Each value
+// depends only on the previous two, so once a pair (mem[i-1], mem[i-2])
+// repeats with period q, the rest of memory repeats with period q too. The
+// fill enters such a short cycle almost immediately, so after detecting it the
+// remaining cells are copied instead of computed.
+func fillMemory(mem *[MemSize]uint16, n int) {
+	const maxPeriod = 16
+	i := n
+	for ; i < MemSize; i++ {
+		mem[i] = Crz(mem[i-1], mem[i-2])
+		for q := 1; q <= maxPeriod && i-1-q >= n; q++ {
+			if mem[i] == mem[i-q] && mem[i-1] == mem[i-1-q] {
+				for j := i + 1; j < MemSize; j++ {
+					mem[j] = mem[j-q]
+				}
+				return
+			}
+		}
+	}
 }

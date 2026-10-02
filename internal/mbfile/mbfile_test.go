@@ -116,3 +116,43 @@ func TestLoadErrors(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestChunkName(t *testing.T) {
+	for _, tt := range []struct {
+		i, n int
+		want string
+	}{{0, 1, "000.mb"}, {7, 12, "007.mb"}, {999, 1000, "999.mb"}, {5, 1001, "0005.mb"}, {12345, 20000, "12345.mb"}} {
+		if got := ChunkName(tt.i, tt.n); got != tt.want {
+			t.Errorf("ChunkName(%d, %d) = %q, want %q", tt.i, tt.n, got, tt.want)
+		}
+	}
+}
+
+func TestWriteReplacesFileAndDir(t *testing.T) {
+	hello := readHello(t)
+	path := filepath.Join(t.TempDir(), "page.html.mb")
+	// Directory first, then a single file over it, then a directory again.
+	for _, chunks := range [][][]byte{{hello, hello, hello}, {hello}, {hello, hello}} {
+		if err := Write(path, chunks); err != nil {
+			t.Fatal(err)
+		}
+		set, err := Load(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(set.Programs) != len(chunks) || set.Chunked != (len(chunks) > 1) {
+			t.Fatalf("wrote %d chunks, loaded %d (chunked=%v)", len(chunks), len(set.Programs), set.Chunked)
+		}
+		out, _, _ := set.RunBytes(context.Background(), nil, malbolge.Limits{})
+		if string(out) != strings.Repeat("Hello, world.", len(chunks)) {
+			t.Fatalf("output %q", out)
+		}
+	}
+	entries, _ := os.ReadDir(filepath.Dir(path))
+	if len(entries) != 1 {
+		t.Fatalf("temporary files left behind: %v", entries)
+	}
+	if err := Write(path, nil); err == nil {
+		t.Fatal("Write accepted zero chunks")
+	}
+}

@@ -1,0 +1,3 @@
+MelHttp serves websites whose every byte is printed by a Malbolge program.
+Malbolge was designed in 1998 by Ben Olmstead to be the most difficult language.
+Ünïcødé, accents (café, naïve, jalapeño), symbols (∑ ∞ ≠), and emoji 🎉✓.

@@ -72,4 +72,4 @@
 testdata/**/*.out   binary
 testdata/**/*.in    binary
 testdata/corpus/**  binary
-testdata/fuzz/**    text eol=lf
+**/testdata/fuzz/** text eol=lf

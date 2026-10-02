@@ -2,6 +2,7 @@ package malbolge
 
 import (
 	"errors"
+	"math/rand/v2"
 	"strings"
 	"testing"
 )
@@ -122,4 +123,33 @@ func FuzzLoad(f *testing.F) {
 			}
 		}
 	})
+}
+
+func TestFillShortcutMatchesNaiveFill(t *testing.T) {
+	r := rand.New(rand.NewPCG(9, 9))
+	for range 300 {
+		n := 2 + r.IntN(3000)
+		src := make([]byte, n)
+		for i := range src {
+			src[i] = Encode(Ops[r.IntN(len(Ops))], i)
+		}
+		p, err := Load(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var naive [MemSize]uint16
+		copy(naive[:], p.mem[:n])
+		for i := n; i < MemSize; i++ {
+			naive[i] = Crz(naive[i-1], naive[i-2])
+		}
+		if naive != p.mem {
+			t.Fatalf("fill shortcut differs from naive fill for a %d-cell program", n)
+		}
+	}
+}
+
+func BenchmarkLoad(b *testing.B) {
+	for b.Loop() {
+		Load([]byte(helloSrc))
+	}
 }

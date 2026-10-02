@@ -6,12 +6,7 @@ import (
 	"io"
 )
 
-// Temporary until P4 (gen) and P7 (build).
-func cmdGen(ctx context.Context, args []string, stdout, stderr io.Writer) int {
-	fmt.Fprintln(stderr, "melc gen: not implemented yet")
-	return exitError
-}
-
+// Temporary until P7 (build).
 func cmdBuild(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fmt.Fprintln(stderr, "melc build: not implemented yet")
 	return exitError

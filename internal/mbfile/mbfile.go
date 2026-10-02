@@ -7,12 +7,14 @@ package mbfile
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/thimis/MelHttp/internal/malbolge"
@@ -127,6 +129,47 @@ func (s *Set) Run(ctx context.Context, in io.Reader, out io.Writer, lim malbolge
 		}
 	}
 	return total, nil
+}
+
+// ChunkName returns the file name of chunk i out of n: zero-padded to at least
+// three digits so that name order is execution order.
+func ChunkName(i, n int) string {
+	width := max(3, len(strconv.Itoa(n-1)))
+	return fmt.Sprintf("%0*d.mb", width, i)
+}
+
+// Write stores a program at path: a single file for one chunk, or a chunk
+// directory for several. Any existing file or directory at path is replaced, and missing parent directories are created.
+// The new program is fully written under a temporary name first.
+func Write(path string, chunks [][]byte) error {
+	if len(chunks) == 0 {
+		return errors.New("mbfile: no chunks to write")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	tmp := fmt.Sprintf("%s.tmp-%d", path, os.Getpid())
+	os.RemoveAll(tmp)
+	if len(chunks) == 1 {
+		if err := os.WriteFile(tmp, chunks[0], 0o644); err != nil {
+			return err
+		}
+	} else {
+		if err := os.Mkdir(tmp, 0o755); err != nil {
+			return err
+		}
+		for i, c := range chunks {
+			if err := os.WriteFile(filepath.Join(tmp, ChunkName(i, len(chunks))), c, 0o644); err != nil {
+				os.RemoveAll(tmp)
+				return err
+			}
+		}
+	}
+	if err := os.RemoveAll(path); err != nil {
+		os.RemoveAll(tmp)
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // fullWriter rejects every write; used once the output budget is spent.
