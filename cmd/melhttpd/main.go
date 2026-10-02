@@ -24,12 +24,13 @@ import (
 	"github.com/thimis/MelHttp/internal/config"
 	"github.com/thimis/MelHttp/internal/server"
 	"github.com/thimis/MelHttp/internal/tlsutil"
+	melversion "github.com/thimis/MelHttp/internal/version"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 )
 
-// version is set at build time with -ldflags "-X main.version=...".
-var version = "dev"
+// version is set by release builds with -ldflags "-X main.version=...".
+var version = melversion.Dev
 
 func main() {
 	if isWindowsService() {

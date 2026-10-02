@@ -9,10 +9,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	melversion "github.com/thimis/MelHttp/internal/version"
 )
 
-// version is set at build time with -ldflags "-X main.version=...".
-var version = "dev"
+// version is set by release builds with -ldflags "-X main.version=...".
+var version = melversion.Dev
 
 const usage = `melc — the MelHttp Malbolge toolchain
 

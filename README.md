@@ -4,6 +4,8 @@ A web server where **every byte you serve is printed by a [Malbolge](https://en.
 
 It serves real sites: the repository includes an Angular Material app, React and Vue apps, and a classic multi-page site. Their HTML, JavaScript, CSS, fonts and images are all compiled to Malbolge and run in a sandboxed VM. In browser tests they work exactly like the originals, and cached pages are served faster than Go's own static file server.
 
+> **Status: alpha (0.1.0).** It works and is heavily tested, but flags, the site layout and the MelCGI contract may still change before 1.0. See the [changelog](CHANGELOG.md).
+
 ## How it works
 
 1. **`melc build`** compiles every file of your site, binary files included, into Malbolge programs that print it. Each program first prints a small CGI-style header. Large files become several programs ("chunks"), and every program is run once to verify it before it is written. → [generator](docs/generator.md)

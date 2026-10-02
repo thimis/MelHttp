@@ -11,6 +11,10 @@ Both are single, self-contained executables with no runtime dependencies.
 They run on **Linux, Windows, macOS and FreeBSD**, on **x86-64 (amd64)** and
 **ARM64**.
 
+> **Alpha.** The current version is **0.1.0**. While the version is 0.x,
+> flags, the site layout and the MelCGI contract may still change between
+> releases; see [CHANGELOG.md](../CHANGELOG.md).
+
 Choose one way to install them:
 
 - [Prebuilt binaries](#prebuilt-binaries): download, unpack, done.
@@ -35,14 +39,17 @@ archive per platform, plus `SHA256SUMS`:
 | macOS | `melhttp_<version>_darwin_amd64.tar.gz` (Intel) | `melhttp_<version>_darwin_arm64.tar.gz` (Apple silicon) |
 | FreeBSD | `melhttp_<version>_freebsd_amd64.tar.gz` | `melhttp_<version>_freebsd_arm64.tar.gz` |
 
-> No release published yet? Every CI run uploads the same archives as the
-> `melhttp-dist` workflow artifact, or build them yourself with
-> `go run ./tools/dist` (see [From source](#from-source)).
+Releases are marked **pre-release** on GitHub while MelHttp is in alpha (0.x).
+
+> Release not on GitHub yet? Build the same archives yourself from a clone,
+> on any OS: `go run ./tools/dist -version v0.1.0` writes all 8 archives and
+> `SHA256SUMS` to `dist/` (see [From source](#from-source)). Every CI run also
+> uploads them as the `melhttp-dist` workflow artifact.
 
 ### Linux
 
 ```bash
-VERSION=1.0.0; ARCH=amd64            # or arm64 (check with: uname -m → x86_64 / aarch64)
+VERSION=0.1.0; ARCH=amd64            # or arm64 (check with: uname -m → x86_64 / aarch64)
 curl -LO https://github.com/thimis/MelHttp/releases/download/v$VERSION/melhttp_${VERSION}_linux_${ARCH}.tar.gz
 curl -LO https://github.com/thimis/MelHttp/releases/download/v$VERSION/SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS
@@ -53,7 +60,7 @@ sudo install -m 0755 melhttp_${VERSION}_linux_${ARCH}/melhttpd melhttp_${VERSION
 ### macOS
 
 ```bash
-VERSION=1.0.0; ARCH=arm64            # arm64 = Apple silicon, amd64 = Intel (check with: uname -m)
+VERSION=0.1.0; ARCH=arm64            # arm64 = Apple silicon, amd64 = Intel (check with: uname -m)
 curl -LO https://github.com/thimis/MelHttp/releases/download/v$VERSION/melhttp_${VERSION}_darwin_${ARCH}.tar.gz
 tar xzf melhttp_${VERSION}_darwin_${ARCH}.tar.gz
 sudo install -m 0755 melhttp_${VERSION}_darwin_${ARCH}/{melhttpd,melc} /usr/local/bin/
@@ -69,8 +76,8 @@ sudo xattr -d com.apple.quarantine /usr/local/bin/melhttpd /usr/local/bin/melc
 3. Add that folder to your `PATH`. In PowerShell:
 
    ```powershell
-   Expand-Archive .\melhttp_1.0.0_windows_amd64.zip C:\melhttp
-   Move-Item C:\melhttp\melhttp_1.0.0_windows_amd64\* C:\melhttp\
+   Expand-Archive .\melhttp_0.1.0_windows_amd64.zip C:\melhttp
+   Move-Item C:\melhttp\melhttp_0.1.0_windows_amd64\* C:\melhttp\
    [Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\melhttp", "User")   # then open a new terminal
    ```
 
@@ -85,7 +92,7 @@ To run as a Windows service, see [deploy/windows.md](../deploy/windows.md).
 ### FreeBSD
 
 ```sh
-VERSION=1.0.0; ARCH=amd64            # or arm64
+VERSION=0.1.0; ARCH=amd64            # or arm64
 fetch https://github.com/thimis/MelHttp/releases/download/v$VERSION/melhttp_${VERSION}_freebsd_${ARCH}.tar.gz
 tar xzf melhttp_${VERSION}_freebsd_${ARCH}.tar.gz
 install -m 0755 melhttp_${VERSION}_freebsd_${ARCH}/melhttpd melhttp_${VERSION}_freebsd_${ARCH}/melc /usr/local/bin/
@@ -145,8 +152,12 @@ go build -o bin/ ./cmd/melc ./cmd/melhttpd
 
 The binaries are in `bin/`; copy them anywhere on your `PATH`.
 
-**Release archives.** `go run ./tools/dist` cross-compiles archives for all 8
-platforms into `dist/`, from any OS.
+A plain `go build` reports its version as `0.1.0-dev`; release archives and
+the Docker image report the exact release.
+
+**Release archives.** `go run ./tools/dist -version v0.1.0` cross-compiles
+archives for all 8 platforms into `dist/`, from any OS. The version must match
+`internal/version`; without `-version` it is taken from `git describe`.
 
 **`go install`** works too, without the browser VM:
 

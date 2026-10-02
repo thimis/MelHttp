@@ -81,7 +81,7 @@ func TestRunUsageAndErrors(t *testing.T) {
 	if _, _, code := melc(t, "", "frobnicate"); code != exitUsage {
 		t.Errorf("unknown command: code %d", code)
 	}
-	if out, _, code := melc(t, "", "version"); code != exitOK || !strings.HasPrefix(out, "melc ") {
+	if out, _, code := melc(t, "", "version"); code != exitOK || out != "melc "+version+"\n" {
 		t.Errorf("version: %d %q", code, out)
 	}
 }

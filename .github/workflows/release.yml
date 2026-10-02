@@ -1,9 +1,11 @@
 name: release
 
 # Push a version tag to publish:
-#   git tag v1.0.0 && git push origin v1.0.0
+#   git tag v0.1.0 && git push origin v0.1.0
 # This creates a GitHub Release with archives for every platform plus
 # SHA256SUMS, and pushes a multi-arch image to ghcr.io/<owner>/melhttp.
+# The tag must match internal/version (tools/dist checks). 0.x versions are
+# alpha and are published as pre-releases.
 
 on:
   push:
@@ -28,7 +30,10 @@ jobs:
       - name: publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" dist/* --title "MelHttp ${GITHUB_REF_NAME}" --generate-notes
+        run: |
+          pre=
+          case "${GITHUB_REF_NAME}" in v0.*|*-*) pre=--prerelease ;; esac
+          gh release create "${GITHUB_REF_NAME}" dist/* --title "MelHttp ${GITHUB_REF_NAME}" --generate-notes $pre
 
   image:
     runs-on: ubuntu-latest

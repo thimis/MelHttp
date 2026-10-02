@@ -110,7 +110,7 @@ func TestHealthcheckFailsWithoutServer(t *testing.T) {
 
 func TestStartupErrors(t *testing.T) {
 	var out, errOut bytes.Buffer
-	if code := run(context.Background(), []string{"-version"}, noenv, &out, &errOut, nil); code != 0 || !strings.HasPrefix(out.String(), "melhttpd ") {
+	if code := run(context.Background(), []string{"-version"}, noenv, &out, &errOut, nil); code != 0 || out.String() != "melhttpd "+version+"\n" {
 		t.Errorf("version: %d %q", code, out.String())
 	}
 	if code := run(context.Background(), []string{"-bogus"}, noenv, &out, &errOut, nil); code != 2 {
