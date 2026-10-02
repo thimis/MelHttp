@@ -438,7 +438,8 @@ func TestG9_CrossPlatformBuilds(t *testing.T) {
 
 func crossBuild(t *testing.T, goos, goarch string, pkgs ...string) {
 	t.Helper()
-	cmd := exec.Command("go", append([]string{"build", "-o", t.TempDir() + string(os.PathSeparator)}, pkgs...)...)
+	// Building several packages without -o compiles them and discards the result.
+	cmd := exec.Command("go", append([]string{"build"}, pkgs...)...)
 	cmd.Dir = repoRoot
 	cmd.Env = append(os.Environ(), "GOOS="+goos, "GOARCH="+goarch, "CGO_ENABLED=0")
 	if out, err := cmd.CombinedOutput(); err != nil {

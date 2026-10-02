@@ -9,14 +9,13 @@ import (
 // to inspect registers and memory (debuggers, generator verification). Use
 // Program.Run for normal execution; it is much faster.
 type Machine struct {
-	Mem     [MemSize]uint16
-	A       uint16
-	C, D    int
-	Steps   int64
-	Halted  bool
-	in      io.ByteReader
-	out     io.ByteWriter
-	scratch [1]byte
+	Mem    [MemSize]uint16
+	A      uint16
+	C, D   int
+	Steps  int64
+	Halted bool
+	in     io.ByteReader
+	out    io.ByteWriter
 }
 
 // NewMachine returns a machine at the start of the program. in may be nil

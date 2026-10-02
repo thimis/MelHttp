@@ -1,0 +1,60 @@
+# One container per test site, all from the same image.
+#
+#   docker compose up --build -d --wait
+#     http://localhost:8080  Angular Material showcase (with /_source/ enabled)
+#     http://localhost:8081  classic multi-page site
+#     http://localhost:8082  MelCGI demos (dynamic programs)
+#     http://localhost:8083  hello world
+#     http://localhost:8084  React (Vite)
+#     http://localhost:8085  Vue (Vite)
+#
+# Compile your own site without installing Go:
+#   docker compose run --rm melc build -o /work/site /work/my-site
+
+x-melhttp: &melhttp
+  build:
+    context: .
+    args:
+      VERSION: local
+  image: melhttp:local
+  read_only: true
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+
+services:
+  angular:
+    <<: *melhttp
+    environment:
+      MELHTTP_ROOT: /srv/sites/angular
+      MELHTTP_EXPOSE_SOURCE: "true"
+    ports: ["8080:8080"]
+  classic:
+    <<: *melhttp
+    environment: { MELHTTP_ROOT: /srv/sites/classic }
+    ports: ["8081:8080"]
+  cgi:
+    <<: *melhttp
+    environment: { MELHTTP_ROOT: /srv/sites/cgi }
+    ports: ["8082:8080"]
+  hello:
+    <<: *melhttp
+    environment: { MELHTTP_ROOT: /srv/sites/hello }
+    ports: ["8083:8080"]
+  react:
+    <<: *melhttp
+    environment: { MELHTTP_ROOT: /srv/sites/react }
+    ports: ["8084:8080"]
+  vue:
+    <<: *melhttp
+    environment: { MELHTTP_ROOT: /srv/sites/vue }
+    ports: ["8085:8080"]
+
+  # The compiler as a tool: docker compose run --rm melc build -o /work/site /work/my-site
+  melc:
+    image: melhttp:local
+    profiles: ["tools"]
+    entrypoint: ["/usr/local/bin/melc"]
+    working_dir: /work
+    volumes: ["./:/work"]
+    user: "${UID:-1000}:${GID:-1000}"

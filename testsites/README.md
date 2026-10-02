@@ -1,8 +1,21 @@
 # MelHttp test sites
 
-Frontend sites used to exercise MelHttp end to end. Each one is a normal single-page app whose
-production build gets converted into Malbolge programs and served by `melhttpd`. All three use
-HTML5 history routing, so the server has to fall back to `index.html` for unknown paths.
+Websites used to exercise MelHttp end to end. Each is compiled into Malbolge with `melc build`,
+served by `melhttpd`, and crawled to check that every byte comes back unchanged (see
+[docs/testing.md](../docs/testing.md)).
+
+| Site | What it covers | Build |
+| --- | --- | --- |
+| `hello/` | one page | `melc build -o out/hello testsites/hello` |
+| `classic/` | multi-page HTML/CSS/JS, a page large enough to be chunked, UTF-8, PNG/GIF/JPEG, JSON, custom 404 | `melc build -o out/classic testsites/classic` |
+| `cgi/` | MelCGI demos: hand-written programs that read the request (`echo.txt.raw.mb`) | `melc build -o out/cgi testsites/cgi` |
+| `angular-showcase/`, `react-vite/`, `vue-vite/` | real framework builds with client-side routing | `melc build --preset auto --run-build -o out/<name> testsites/<name>` |
+
+## Frontend sites
+
+The three frontend sites are normal single-page apps whose production builds get converted into
+Malbolge programs and served by `melhttpd`. All three use HTML5 history routing, so the server
+has to fall back to `index.html` for unknown paths.
 
 | Site | Stack | Build output | Default test URL |
 | --- | --- | --- | --- |
