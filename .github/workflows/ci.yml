@@ -24,6 +24,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
+      - name: generate browser VM assets
+        run: go generate ./internal/webvm
       - name: gofmt
         if: matrix.os == 'ubuntu-latest'
         run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
@@ -47,6 +49,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+      - run: go generate ./internal/webvm
       - run: go test -race ./...
 
   # Static analysis and known-vulnerability scan.
@@ -57,6 +60,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+      - run: go generate ./internal/webvm
       - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
       - run: go run honnef.co/go/tools/cmd/staticcheck@latest ./...
 
@@ -83,7 +87,8 @@ jobs:
           node-version: 24
       - name: install Playwright browsers
         run: |
-          for d in angular-showcase react-vite vue-vite; do (cd testsites/$d && npm ci --no-audit --no-fund); done
+          go generate ./internal/webvm
+          for d in angular-showcase react-vite vue-vite obfuscated; do (cd testsites/$d && npm ci --no-audit --no-fund); done
           (cd testsites/angular-showcase && npx playwright install --with-deps chromium)
       - run: MELHTTP_DOCKER=1 go test -tags acceptance -timeout 60m -v ./acceptance
 

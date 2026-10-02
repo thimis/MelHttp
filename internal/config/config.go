@@ -92,6 +92,11 @@ func Parse(args []string, getenv func(string) string, output io.Writer) (Config,
 	fs.StringVar(&c.TLS.PublicPort, "https-port", "", "public HTTPS `port` for redirects (default: the -tls-addr port; 443 is omitted)")
 	fs.StringVar(&c.TLS.MinVersion, "tls-min", "1.2", "minimum TLS `version`: 1.2 or 1.3")
 	fs.DurationVar(&c.Server.HSTS, "hsts", 0, "send Strict-Transport-Security with this max-age on HTTPS (e.g. 8760h; 0 = off)")
+	fs.BoolVar(&c.Server.Obfuscate, "obfuscate", false, "Malbolge transport: send bodies as Malbolge programs to the /_melhttp/ service worker (obfuscation, not encryption)")
+	fs.IntVar(&c.Server.ObfuscateVariants, "obfuscate-variants", 2, "differently-seeded encodings kept per page")
+	fs.BoolVar(&c.Server.Playground, "playground", false, "serve the in-browser Malbolge playground at /_melhttp/")
+	fs.BoolVar(&c.Server.WASI, "wasi", false, "run WebAssembly MelCGI handlers (*.wasi files), sandboxed: no files, environment or network")
+	fs.IntVar(&c.Server.WASIMemoryMB, "wasi-memory-mb", 64, "memory limit per WASI handler run, in MiB")
 
 	set := map[string]bool{}
 	if err := fs.Parse(args); err != nil {

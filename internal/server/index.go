@@ -14,6 +14,8 @@ const (
 	kindStatic  kind = iota // a plain file
 	kindProgram             // a MelCGI program (.mb file or chunk directory)
 	kindRaw                 // a program whose whole output is the body (.raw.mb)
+	kindWASI                // a WebAssembly (WASI) MelCGI handler (.wasi)
+	kindWASIRaw             // a WASI handler whose whole output is the body (.raw.wasi)
 )
 
 // entry is one servable URL.
@@ -77,6 +79,10 @@ func (ix *index) scan() {
 		}
 		lower := strings.ToLower(name)
 		switch {
+		case strings.HasSuffix(lower, ".raw.wasi") && !isDir:
+			add(&entry{url: "/" + p[:len(p)-len(".raw.wasi")], file: p, kind: kindWASIRaw})
+		case strings.HasSuffix(lower, ".wasi") && !isDir:
+			add(&entry{url: "/" + p[:len(p)-len(".wasi")], file: p, kind: kindWASI})
 		case strings.HasSuffix(lower, ".raw.mb"):
 			add(&entry{url: "/" + p[:len(p)-len(".raw.mb")], file: p, kind: kindRaw, dir: isDir})
 		case strings.HasSuffix(lower, ".mb"):

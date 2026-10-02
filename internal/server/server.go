@@ -9,6 +9,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/thimis/MelHttp/internal/wasi"
+	"github.com/thimis/MelHttp/internal/webvm"
 )
 
 // Server serves one site directory.
@@ -24,6 +27,11 @@ type Server struct {
 
 	dynMu sync.Mutex
 	dyn   map[string]string // URL → version of programs that read input
+
+	assets http.Handler // /_melhttp/ browser assets, when enabled
+	obfMu  sync.Mutex
+	obf    map[string]*variants // URL+ETag → transport encodings
+	wasi   *wasi.Runner         // WASI handlers, when enabled
 }
 
 // New opens the site at cfg.Root.
@@ -42,6 +50,11 @@ func New(cfg Config) (*Server, error) {
 }
 
 func newServer(cfg Config, root *os.Root, fsys fs.FS) (*Server, error) {
+	if cfg.Obfuscate || cfg.Playground {
+		if err := webvm.Available(); err != nil {
+			return nil, err
+		}
+	}
 	site, err := loadSiteConfig(fsys)
 	if err != nil {
 		return nil, err
@@ -59,6 +72,15 @@ func newServer(cfg Config, root *os.Root, fsys fs.FS) (*Server, error) {
 		cache: newCache(cfg.CacheBytes),
 		sem:   make(chan struct{}, cfg.MaxConcurrent),
 		dyn:   map[string]string{},
+		obf:   map[string]*variants{},
+	}
+	if cfg.Obfuscate || cfg.Playground {
+		s.assets = webvm.Handler(cfg.Obfuscate, cfg.Playground)
+	}
+	if cfg.WASI {
+		if s.wasi, err = wasi.New(context.Background(), cfg.WASIMemoryMB); err != nil {
+			return nil, err
+		}
 	}
 	for _, w := range s.index.warnings {
 		cfg.Logger.Warn("site", "warning", w)
@@ -68,6 +90,9 @@ func newServer(cfg Config, root *os.Root, fsys fs.FS) (*Server, error) {
 
 // Close releases the site root.
 func (s *Server) Close() error {
+	if s.wasi != nil {
+		s.wasi.Close(context.Background())
+	}
 	if s.root != nil {
 		return s.root.Close()
 	}
@@ -96,8 +121,8 @@ func (s *Server) Warm(ctx context.Context) WarmStats {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	for _, e := range s.index.all() {
-		if e.kind == kindStatic {
-			continue
+		if e.kind != kindProgram && e.kind != kindRaw {
+			continue // static files need no warm-up; WASI handlers always run per request
 		}
 		wg.Add(1)
 		go func() {

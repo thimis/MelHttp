@@ -236,3 +236,23 @@ func TestResolveAndOutputDir(t *testing.T) {
 		t.Errorf("PresetNames = %v", PresetNames())
 	}
 }
+
+func TestWASIPassThrough(t *testing.T) {
+	src := t.TempDir()
+	write(t, src, "index.html", []byte("<p>x</p>"))
+	module := []byte("\x00asm\x01\x00\x00\x00")
+	write(t, src, "api/hello.txt.wasi", module)
+	out := filepath.Join(t.TempDir(), "o")
+	st, err := Site(context.Background(), Options{Src: src, Out: out})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(filepath.Join(out, "api", "hello.txt.wasi"))
+	if !bytes.Equal(got, module) || st.Copied != 1 {
+		t.Fatalf("module not copied verbatim: %q %+v", got, st)
+	}
+	write(t, src, "bad.wasi", []byte("not wasm"))
+	if _, err := Site(context.Background(), Options{Src: src, Out: out}); err == nil {
+		t.Fatal("accepted a non-wasm .wasi file")
+	}
+}

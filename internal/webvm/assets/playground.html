@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Malbolge Playground</title>
+<style>
+:root { --fg: #1d1d1f; --bg: #fbfbfd; --panel: #ffffff; --line: #d2d2d7; --accent: #8b1e3f; --muted: #6e6e73; }
+@media (prefers-color-scheme: dark) { :root { --fg: #f5f5f7; --bg: #111114; --panel: #1c1c20; --line: #3a3a40; --accent: #ff7aa2; --muted: #a1a1a6; } }
+* { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); background: var(--bg); }
+main { max-width: 64rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+h1 { margin: 0 0 .25rem; } p.lead { margin: 0 0 1.5rem; color: var(--muted); }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; margin-bottom: 1.25rem; }
+h2 { margin: 0 0 .75rem; font-size: 1.1rem; }
+label { display: block; font-weight: 600; margin: .5rem 0 .25rem; }
+textarea, pre { width: 100%; font: 13px/1.4 ui-monospace, "Cascadia Code", Menlo, monospace; color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: .6rem; }
+textarea { min-height: 7rem; resize: vertical; }
+pre { white-space: pre-wrap; word-break: break-all; min-height: 2.5rem; max-height: 20rem; overflow: auto; margin: 0; }
+button { font: inherit; padding: .45rem 1rem; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+button:disabled { opacity: .5; cursor: wait; }
+.row { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-top: .75rem; }
+.stats { color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<main>
+<h1>Malbolge Playground</h1>
+<p class="lead">The MelHttp VM and generator, compiled from Go to WebAssembly, running in your browser. <span id="status">Loading VM…</span></p>
+
+<section>
+<h2>Run a program</h2>
+<label for="program">Malbolge source</label>
+<textarea id="program" spellcheck="false">(=&lt;`#9]~6ZY327Uv4-QsqpMn&amp;+Ij"'E%e{Ab~w=_:]Kw%o44Uqp0/Q?xNvL:`H%c#DD2^WV&gt;gY;dts76qKJImZkj</textarea>
+<label for="input">Input (stdin)</label>
+<textarea id="input" spellcheck="false" style="min-height:3rem"></textarea>
+<div class="row"><button id="run" disabled>Run</button><span id="runStats" class="stats"></span></div>
+<label for="output">Output</label>
+<pre id="output"></pre>
+</section>
+
+<section>
+<h2>Compile text to Malbolge</h2>
+<label for="text">Text</label>
+<textarea id="text" spellcheck="false">Hello from your browser! Ünïcødé works too ✓</textarea>
+<div class="row"><button id="compile" disabled>Compile</button><span id="compileStats" class="stats"></span></div>
+<label for="compiled">Generated Malbolge (verified by running it)</label>
+<pre id="compiled"></pre>
+<div class="row"><button id="useIt" disabled>Load into the runner</button></div>
+</section>
+</main>
+<script src="/_melhttp/wasm_exec.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const enc = new TextEncoder(), dec = new TextDecoder();
+(async () => {
+  try {
+    const go = new Go();
+    const { instance } = await WebAssembly.instantiateStreaming(fetch("/_melhttp/melhttp.wasm"), go.importObject);
+    go.run(instance);
+    $("status").textContent = "VM ready (" + globalThis.melhttpVersion + ").";
+    $("run").disabled = $("compile").disabled = false;
+  } catch (err) {
+    $("status").textContent = "Could not load the VM: " + err;
+  }
+})();
+$("run").addEventListener("click", () => {
+  const t0 = performance.now();
+  const r = melhttpRun($("program").value, enc.encode($("input").value), 100000000);
+  const ms = (performance.now() - t0).toFixed(1);
+  if (r.output) $("output").textContent = dec.decode(r.output);
+  $("runStats").textContent = (r.error ? "stopped: " + r.error + " — " : "") +
+    (r.steps || 0).toLocaleString() + " steps in " + ms + " ms" + (r.halted ? ", halted" : "");
+});
+$("compile").addEventListener("click", () => {
+  $("compile").disabled = true;
+  $("compileStats").textContent = "Compiling (the first run builds the generator's tables, a few seconds)…";
+  setTimeout(() => {
+    const t0 = performance.now();
+    const bytes = enc.encode($("text").value);
+    const r = melhttpCompile(bytes, 0);
+    const ms = (performance.now() - t0).toFixed(0);
+    $("compile").disabled = false;
+    if (r.error) { $("compileStats").textContent = "error: " + r.error; return; }
+    $("compiled").textContent = r.programs;
+    $("compileStats").textContent = bytes.length + " bytes → " + r.count + " program(s), " + r.cells.toLocaleString() + " cells, in " + ms + " ms";
+    $("useIt").disabled = r.count !== 1;
+  }, 30);
+});
+$("useIt").addEventListener("click", () => { $("program").value = $("compiled").textContent; $("input").value = ""; $("run").click(); });
+</script>
+</body>
+</html>

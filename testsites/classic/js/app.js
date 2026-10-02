@@ -10,6 +10,14 @@
       counter.textContent = String(n);
     });
   }
+  if (window.WebAssembly && WebAssembly.instantiateStreaming) {
+    WebAssembly.instantiateStreaming(fetch("/wasm/add.wasm"))
+      .then(function (r) {
+        var el = document.getElementById("wasm");
+        if (el) { el.textContent = "add(2, 3) = " + r.instance.exports.add(2, 3); }
+      })
+      .catch(function () {});
+  }
   fetch("/data/info.json")
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (info) {

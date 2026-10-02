@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 #
 # MelHttp image: melhttpd + melc on distroless, with the test sites compiled
-# into Malbolge under /srv/sites/{angular,react,vue,classic,cgi,hello}.
+# into Malbolge under /srv/sites/{angular,react,vue,classic,cgi,hello,obfuscated,wasi}.
 #
 #   docker build -t melhttp .
 #   docker run --rm -p 8080:8080 melhttp                        # Angular showcase
@@ -37,7 +37,8 @@ RUN go mod download
 COPY . .
 ARG VERSION=dev
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/ ./cmd/melc ./cmd/melhttpd \
+    go generate ./internal/webvm \
+ && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/ ./cmd/melc ./cmd/melhttpd \
  && mkdir -p /out/certs
 
 # ---- tests (docker build --target test .) -------------------------------------
@@ -54,7 +55,10 @@ RUN /out/melc build -o /sites/hello testsites/hello \
  && /out/melc build -o /sites/cgi testsites/cgi \
  && /out/melc build --preset angular -o /sites/angular testsites/angular-showcase \
  && /out/melc build --preset vite -o /sites/react testsites/react-vite \
- && /out/melc build --preset vite -o /sites/vue testsites/vue-vite
+ && /out/melc build --preset vite -o /sites/vue testsites/vue-vite \
+ && /out/melc build -o /sites/obfuscated testsites/obfuscated/site \
+ && GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0 go build -o testsites/wasi/hello.html.wasi ./testsites/wasi/src \
+ && /out/melc build -o /sites/wasi testsites/wasi
 
 # ---- runtime ------------------------------------------------------------------
 FROM gcr.io/distroless/static-debian12:nonroot

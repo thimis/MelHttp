@@ -112,6 +112,19 @@ Sites can add more, such as a full CSP or HSTS, with `headers` in
 Please report security issues privately to the repository owner, not in
 public issues.
 
+## WASI handlers (opt-in, `-wasi`)
+
+WebAssembly modules run in wazero, a pure-Go runtime. They get no mounted
+files, an empty environment and no sockets. Memory is capped (`-wasi-memory-mb`),
+and the module is terminated when it hits the time or output limit. Module bytes
+are never served. See [wasi.md](wasi.md).
+
+## Browser assets (opt-in, `-obfuscate`, `-playground`)
+
+`/_melhttp/` is only served when one of these flags is on. The service worker
+only intercepts same-origin GET requests and passes anything it cannot decode
+through unchanged. Encoded responses are `Cache-Control: no-store`.
+
 ## Not a security feature
 
 Malbolge "obfuscation" of traffic (see [roadmap.md](roadmap.md)) is

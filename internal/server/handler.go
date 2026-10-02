@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/thimis/MelHttp/internal/mbfile"
+	"github.com/thimis/MelHttp/internal/obfs"
+	"github.com/thimis/MelHttp/internal/webvm"
 )
 
 const sourcePrefix = "/_source/"
@@ -51,6 +53,10 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		io.WriteString(w, "ok\n")
+		return
+	}
+	if s.assets != nil && strings.HasPrefix(p, webvm.Prefix) {
+		s.assets.ServeHTTP(w, r)
 		return
 	}
 	if !validURLPath(p) {
@@ -132,6 +138,9 @@ func (s *Server) write(w http.ResponseWriter, r *http.Request, e *entry, res *re
 		h.Set("X-Powered-By", "Malbolge")
 		h.Set("X-Malbolge-Steps", strconv.FormatInt(res.steps, 10))
 	}
+	if res.wasm {
+		h.Set("X-Powered-By", "WebAssembly (MelHttp WASI)")
+	}
 	if hit {
 		h.Set("X-Malbolge-Cache", "hit")
 	} else {
@@ -139,6 +148,13 @@ func (s *Server) write(w http.ResponseWriter, r *http.Request, e *entry, res *re
 	}
 	if status == 0 {
 		status = res.status
+	}
+	if s.cfg.Obfuscate {
+		h.Add("Vary", obfs.AcceptHeader)
+		if status == http.StatusOK && s.wantsProgram(r) {
+			s.writeProgram(w, r, e.url, res)
+			return
+		}
 	}
 	cacheable := status == http.StatusOK && res.deterministic
 	if h.Get("Cache-Control") == "" {
@@ -237,7 +253,7 @@ func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
 // for curious visitors (enabled with Config.ExposeSource).
 func (s *Server) serveSource(w http.ResponseWriter, r *http.Request, target string) {
 	e := s.resolve(target)
-	if e == nil || e.kind == kindStatic || !validURLPath(target) {
+	if e == nil || (e.kind != kindProgram && e.kind != kindRaw) || !validURLPath(target) {
 		http.Error(w, "no Malbolge program at "+target, http.StatusNotFound)
 		return
 	}

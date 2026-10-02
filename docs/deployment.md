@@ -25,6 +25,12 @@ environment.
 | `-cache-mb` | `MELHTTP_CACHE_MB` | 512 | response cache size |
 | `-allow-sensitive-headers` | `MELHTTP_ALLOW_SENSITIVE_HEADERS` | false | pass Cookie/Authorization to programs |
 | `-log-format` | `MELHTTP_LOG_FORMAT` | text | `text` or `json` |
+| `-obfuscate` | `MELHTTP_OBFUSCATE` | false | Malbolge transport for browsers that opt in ([transport.md](transport.md)) |
+| `-obfuscate-variants` | `MELHTTP_OBFUSCATE_VARIANTS` | 2 | encodings kept per page |
+| `-playground` | `MELHTTP_PLAYGROUND` | false | in-browser playground at `/_melhttp/playground.html` |
+| `-wasi` | `MELHTTP_WASI` | false | run `*.wasi` WebAssembly handlers ([wasi.md](wasi.md)) |
+| `-wasi-memory-mb` | `MELHTTP_WASI_MEMORY_MB` | 64 | memory per WASI run |
+| `-hsts` | `MELHTTP_HSTS` | 0 | HSTS max-age on HTTPS responses |
 | `-healthcheck` | — | | probe `-addr` and exit 0/1 (for container health checks) |
 
 `GET /healthz` returns `200 ok`.
@@ -32,7 +38,7 @@ environment.
 ## Docker
 
 ```bash
-docker compose up --build -d --wait      # six demo sites on ports 8080-8085
+docker compose up --build -d --wait      # eight demo sites on ports 8080-8087
 docker build -t melhttp .                # just the image (≈53 MB, distroless, non-root)
 docker run --rm -p 8080:8080 -e MELHTTP_ROOT=/srv/sites/classic melhttp
 ```

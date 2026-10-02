@@ -441,3 +441,9 @@ desktop.ini
 # Docker
 compose.override.yaml
 docker-compose.override.yml
+
+# Generated browser assets (go generate ./internal/webvm)
+internal/webvm/assets/melhttp.wasm
+internal/webvm/assets/wasm_exec.js
+# Built WASI demo module (go build, see testsites/wasi/src)
+testsites/wasi/*.wasi

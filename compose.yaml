@@ -7,6 +7,8 @@
 #     http://localhost:8083  hello world
 #     http://localhost:8084  React (Vite)
 #     http://localhost:8085  Vue (Vite)
+#     http://localhost:8086  Malbolge transport (pages travel as Malbolge; reload once) + /_melhttp/playground.html
+#     http://localhost:8087  WASI handlers (/hello.html is Go compiled to WebAssembly)
 #
 # Compile your own site without installing Go:
 #   docker compose run --rm melc build -o /work/site /work/my-site
@@ -49,6 +51,19 @@ services:
     <<: *melhttp
     environment: { MELHTTP_ROOT: /srv/sites/vue }
     ports: ["8085:8080"]
+  obfuscated:
+    <<: *melhttp
+    environment:
+      MELHTTP_ROOT: /srv/sites/obfuscated
+      MELHTTP_OBFUSCATE: "true"
+      MELHTTP_PLAYGROUND: "true"
+    ports: ["8086:8080"]
+  wasi:
+    <<: *melhttp
+    environment:
+      MELHTTP_ROOT: /srv/sites/wasi
+      MELHTTP_WASI: "true"
+    ports: ["8087:8080"]
 
   # The compiler as a tool: docker compose run --rm melc build -o /work/site /work/my-site
   melc:

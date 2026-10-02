@@ -32,7 +32,17 @@ type Config struct {
 	Revalidate            time.Duration
 	AllowSensitiveHeaders bool          // pass Cookie/Authorization to programs
 	HSTS                  time.Duration // Strict-Transport-Security max-age on HTTPS responses (0 = off)
-	Logger                *slog.Logger
+	// Obfuscate enables the Malbolge transport: requests carrying
+	// "X-Malbolge-Accept: program" get the body as Malbolge programs, and
+	// /_melhttp/ serves the service worker that decodes them in browsers.
+	Obfuscate         bool
+	ObfuscateVariants int  // differently-seeded encodings kept per page (default 2)
+	Playground        bool // serve the in-browser Malbolge playground at /_melhttp/
+	// WASI enables WebAssembly MelCGI handlers (*.wasi files), sandboxed by
+	// wazero: no file system, environment or network; WASIMemoryMB per run.
+	WASI         bool
+	WASIMemoryMB int // default 64
+	Logger       *slog.Logger
 }
 
 func (c Config) withDefaults() Config {
@@ -53,6 +63,9 @@ func (c Config) withDefaults() Config {
 	}
 	if c.CacheBytes <= 0 {
 		c.CacheBytes = 512 << 20
+	}
+	if c.ObfuscateVariants <= 0 {
+		c.ObfuscateVariants = 2
 	}
 	if c.Revalidate == 0 {
 		c.Revalidate = time.Second

@@ -58,6 +58,8 @@ omitted, not sent empty.
 | `SERVER_NAME`       | always                   | host part of the `Host` header (IPv6 without brackets) |
 | `SERVER_PORT`       | always                   | port of the `Host` header; `80` if absent (`443` over TLS) |
 | `REMOTE_ADDR`       | always                   | client IP address, without port (`::1`, not `[::1]:1234`) |
+| `HTTPS`             | request came over TLS    | `on` |
+| `REQUEST_SCHEME`    | request came over TLS    | `https` (absent means plain `http`) |
 | `CONTENT_TYPE`      | request has Content-Type | the request `Content-Type` |
 | `CONTENT_LENGTH`    | body length > 0          | body length in bytes, decimal |
 | `HTTP_*`            | see below                | request headers, sorted by variable name |

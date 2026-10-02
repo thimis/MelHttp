@@ -29,6 +29,10 @@ programs in a sandboxed VM to answer requests.
 | `internal/config` | Flags and `MELHTTP_*` environment variables for `melhttpd`. |
 | `internal/mimetype` | A fixed Content-Type table that behaves the same on every OS. |
 | `internal/crawl` | Checks that every source file is served byte-identically (used by tests and `tools/crawl`). |
+| `internal/obfs` | The Malbolge transport encoding (see [transport.md](transport.md)). |
+| `internal/webvm`, `cmd/melwasm` | The VM, decoder and generator compiled to WebAssembly, plus the service worker and playground served under `/_melhttp/`. |
+| `internal/wasi` | WebAssembly (WASI) MelCGI handlers in a wazero sandbox (see [wasi.md](wasi.md)). |
+| `internal/tlsutil` | HTTPS: certificate reloading, ACME (Let's Encrypt), self-signed certificates. |
 
 ## How a site maps to URLs
 
@@ -40,6 +44,8 @@ misses, at most once per second, so new files appear without a restart.
 | `about.html.mb` | `/about.html` | MelCGI program: prints headers, a blank line, then the body |
 | `about.html.mb/000.mb`, `001.mb`, … | `/about.html` | chunked program: chunks run in order and their outputs concatenate |
 | `echo.txt.raw.mb` | `/echo.txt` | raw program: the whole output is the body; the type comes from `.txt` |
+| `hello.html.wasi` | `/hello.html` | WebAssembly MelCGI handler (only with `-wasi`, never cached) |
+| — | `/_melhttp/…` | browser VM, service worker and playground (only with `-obfuscate` or `-playground`) |
 | `index.html.mb` | `/` and `/index.html` | directory index (`/docs` redirects to `/docs/`) |
 | `404.html.mb` | any unknown URL | custom 404 page, status 404 |
 | `style.css` | `/style.css` | static file (allowed, but `melc build` compiles everything) |

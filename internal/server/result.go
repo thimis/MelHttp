@@ -19,6 +19,7 @@ import (
 	"github.com/thimis/MelHttp/internal/mbfile"
 	"github.com/thimis/MelHttp/internal/melcgi"
 	"github.com/thimis/MelHttp/internal/mimetype"
+	"github.com/thimis/MelHttp/internal/wasi"
 )
 
 // result is a complete response produced by a program or a static file.
@@ -30,6 +31,7 @@ type result struct {
 	etag          string // strong ETag of body
 	steps         int64  // VM instructions (0 for static files)
 	program       bool
+	wasm          bool   // produced by a WASI handler
 	deterministic bool   // the program never read its input
 	version       string // signature of the files it came from
 }
@@ -88,16 +90,15 @@ func (s *Server) produce(ctx context.Context, e *entry, r *http.Request) (*resul
 		h := http.Header{"Content-Type": {mimetype.ByName(e.url)}}
 		return finish(&result{status: http.StatusOK, header: h, body: body, deterministic: true, version: version}), nil
 	}
+	if (e.kind == kindWASI || e.kind == kindWASIRaw) && s.wasi == nil {
+		return nil, &httpError{http.StatusNotFound, errors.New("WASI handlers are disabled (-wasi)")}
+	}
 
 	select {
 	case s.sem <- struct{}{}:
 		defer func() { <-s.sem }()
 	case <-ctx.Done():
 		return nil, &httpError{http.StatusServiceUnavailable, ctx.Err()}
-	}
-	set, err := mbfile.LoadFS(s.fsys, e.file)
-	if err != nil {
-		return nil, &httpError{http.StatusInternalServerError, err}
 	}
 	ctx, cancel := context.WithTimeout(ctx, s.cfg.Timeout)
 	defer cancel()
@@ -109,6 +110,13 @@ func (s *Server) produce(ctx context.Context, e *entry, r *http.Request) (*resul
 	}
 	in := melcgi.Input(req.Meta(melcgi.Options{AllowSensitiveHeaders: s.cfg.AllowSensitiveHeaders}), body)
 	var out bytes.Buffer
+	if e.kind == kindWASI || e.kind == kindWASIRaw {
+		return s.produceWASI(ctx, e, version, in, &out)
+	}
+	set, err := mbfile.LoadFS(s.fsys, e.file)
+	if err != nil {
+		return nil, &httpError{http.StatusInternalServerError, err}
+	}
 	run, err := set.Run(ctx, in, &out, malbolge.Limits{MaxSteps: s.cfg.MaxSteps, MaxOutput: s.cfg.MaxOutput})
 	s.runs.Add(1)
 	if err != nil {
@@ -298,4 +306,33 @@ func (s *Server) markDynamic(url, version string) {
 	s.dynMu.Lock()
 	s.dyn[url] = version
 	s.dynMu.Unlock()
+}
+
+// produceWASI runs a WebAssembly handler. Its responses are never cached:
+// unlike a Malbolge program, a WASI module can read the clock and random
+// numbers, so its output may change on every request.
+func (s *Server) produceWASI(ctx context.Context, e *entry, version string, in io.Reader, out *bytes.Buffer) (*result, error) {
+	load := func() ([]byte, error) {
+		code, err := fs.ReadFile(s.fsys, e.file)
+		if err == nil && !bytes.HasPrefix(code, []byte(wasi.Magic)) {
+			err = errors.New("not a WebAssembly module")
+		}
+		return code, err
+	}
+	err := s.wasi.Run(ctx, e.file, version, load, in, out, s.cfg.MaxOutput)
+	s.runs.Add(1)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, wasi.ErrTimeout) {
+			status = http.StatusServiceUnavailable
+		}
+		return nil, &httpError{status, fmt.Errorf("%s: %w", e.file, err)}
+	}
+	var resp *melcgi.Response
+	if e.kind == kindWASIRaw {
+		resp = melcgi.RawResponse(out.Bytes(), mimetype.ByName(e.url))
+	} else if resp, err = melcgi.ParseResponse(out.Bytes()); err != nil {
+		return nil, &httpError{http.StatusBadGateway, fmt.Errorf("%s: %w", e.file, err)}
+	}
+	return finish(&result{status: resp.Status, header: resp.Header, body: resp.Body, wasm: true, version: version}), nil
 }

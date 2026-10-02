@@ -11,6 +11,8 @@ It serves real sites: the repository includes an Angular Material app, React and
 3. Programs talk to the server through **MelCGI**, a strict CGI-like contract: the request goes in on stdin, and the response comes back on stdout. → [MelCGI](docs/melcgi.md)
 4. Programs that don't read their input are run once at startup and cached with ETags and gzip. Serving is then as fast as a normal static server. → [architecture](docs/architecture.md), [performance](docs/performance.md)
 
+Extras: HTTPS with automatic Let's Encrypt certificates, an optional **Malbolge transport** (pages travel to the browser as Malbolge programs and the browser runs them), a browser **playground**, and **WASI** handlers for WebAssembly modules.
+
 ## Setup
 
 ### Option A: prebuilt binaries
@@ -29,7 +31,7 @@ go run ./tools/dist                                # optional: release archives 
 ```bash
 docker compose up --build -d --wait
 ```
-This builds the image (about 53 MB, distroless, non-root) and starts six demo sites:
+This builds the image (about 53 MB, distroless, non-root) and starts eight demo sites:
 
 | Port | Site |
 |---|---|
@@ -39,6 +41,8 @@ This builds the image (about 53 MB, distroless, non-root) and starts six demo si
 | 8083 | hello |
 | 8084 | React |
 | 8085 | Vue |
+| 8086 | Malbolge transport demo (reload once) and playground |
+| 8087 | WASI handlers (Go compiled to WebAssembly) |
 
 ## Usage
 
@@ -61,6 +65,9 @@ Useful `melhttpd` flags (each can also be set with a `MELHTTP_*` environment var
 | `-max-steps`, `-timeout`, `-max-body` | 2e9, 30s, 1 MiB | per-request limits |
 | `-healthcheck` | | exit 0 if a server on `-addr` is healthy (for Docker) |
 | `-acme-domains`, `-tls-cert`/`-tls-key`, `-tls-self-signed` | off | enable HTTPS on `-tls-addr` (`:8443`) |
+| `-obfuscate` | off | send pages to browsers *as Malbolge programs*, decoded by a service worker running the VM in WebAssembly (obfuscation, not encryption) → [docs/transport.md](docs/transport.md) |
+| `-playground` | off | in-browser Malbolge playground at `/_melhttp/playground.html` |
+| `-wasi` | off | run WebAssembly (`*.wasi`) modules as sandboxed CGI handlers → [docs/wasi.md](docs/wasi.md) |
 
 All flags, plus systemd, launchd and Windows setup: [docs/deployment.md](docs/deployment.md). **HTTPS:** `-acme-domains example.com` gets free, automatically renewed Let's Encrypt certificates (ports 80 and 443 must reach the server), `-tls-cert`/`-tls-key` serves your own, and `-tls-self-signed` is for local testing. Plain HTTP then redirects to HTTPS, and `-hsts 8760h` adds HSTS. Details: [docs/deployment.md#https](docs/deployment.md#https).
 

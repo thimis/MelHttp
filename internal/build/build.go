@@ -4,6 +4,7 @@
 package build
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -26,6 +27,7 @@ import (
 	"github.com/thimis/MelHttp/internal/melcgi"
 	"github.com/thimis/MelHttp/internal/mimetype"
 	"github.com/thimis/MelHttp/internal/server"
+	"github.com/thimis/MelHttp/internal/wasi"
 )
 
 // GeneratorVersion changes whenever generated code changes, invalidating the
@@ -251,6 +253,18 @@ func listFiles(src string) ([]string, error) {
 // buildFile compiles (or reuses, or copies) one source file into tmp.
 func buildFile(ctx context.Context, src, out, tmp, rel string, old manifest, seed uint64) (kind, hash string, nIn, nOut int64, nProg int, err error) {
 	srcPath := filepath.Join(src, filepath.FromSlash(rel))
+	if strings.HasSuffix(strings.ToLower(rel), ".wasi") {
+		// A WebAssembly handler: check it is one and copy it as is.
+		data, err := os.ReadFile(srcPath)
+		if err != nil {
+			return "", "", 0, 0, 0, err
+		}
+		if !bytes.HasPrefix(data, []byte(wasi.Magic)) {
+			return "", "", 0, 0, 0, errors.New("not a WebAssembly module")
+		}
+		n, err := copyTree(srcPath, filepath.Join(tmp, filepath.FromSlash(rel)))
+		return "copied", "", n, n, 0, err
+	}
 	if strings.HasSuffix(strings.ToLower(rel), ".mb") {
 		// A hand-written program: validate it and copy it as is.
 		set, err := mbfile.Load(srcPath)

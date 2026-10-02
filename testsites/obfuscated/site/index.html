@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Malbolge transport demo</title>
+<style>body{font:17px/1.6 system-ui,sans-serif;max-width:42rem;margin:2rem auto;padding:0 1rem}code{font-family:ui-monospace,monospace}</style>
+<script src="/_melhttp/obfuscate.js"></script>
+</head>
+<body>
+<h1>Malbolge transport demo</h1>
+<p>Once the service worker is active (reload once), every request from this page travels as a
+<strong>Malbolge program</strong>. Your browser runs it in the MelHttp VM, compiled to WebAssembly, to get the bytes back.</p>
+<p>Open the network tab and look at <code>about.html</code>: the response is Malbolge source text.
+This is obfuscation, not encryption.</p>
+<p>Transport: <strong id="state">plain (first visit)</strong></p>
+<p><a href="/about.html">About</a> · <a href="/_melhttp/playground.html">Playground</a></p>
+<img src="/img/noise.png" width="192" alt="a PNG decoded from Malbolge">
+<script>
+if (document.documentElement.dataset.malbolgeTransport === "active" || (navigator.serviceWorker && navigator.serviceWorker.controller)) {
+  document.getElementById("state").textContent = "Malbolge programs, decoded by the service worker";
+}
+</script>
+</body>
+</html>

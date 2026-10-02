@@ -693,3 +693,64 @@ func TestG12_ACMECertificates(t *testing.T) {
 		t.Errorf("HTTP redirect: %d %q", r.StatusCode, r.Header.Get("Location"))
 	}
 }
+
+// ---------------------------------------------------------------------------
+// G13 — Malbolge transport and WebAssembly in a real browser: pages travel as
+// Malbolge programs and a service worker decodes them with the Go VM compiled
+// to WebAssembly; the playground runs and compiles Malbolge in the browser.
+// ---------------------------------------------------------------------------
+
+func TestG13_MalbolgeTransportInBrowser(t *testing.T) {
+	requireBinaries(t)
+	proj := filepath.Join(repoRoot, "testsites", "obfuscated")
+	if !have("npm") {
+		t.Fatal("npm is required")
+	}
+	if _, err := os.Stat(filepath.Join(proj, "node_modules")); err != nil {
+		run(t, proj, 15*time.Minute, npmCmd(), "ci", "--no-audit", "--no-fund")
+	}
+	out := filepath.Join(t.TempDir(), "site")
+	melc(t, nil, "build", "-o", out, filepath.Join(proj, "site"))
+	base := startServer(t, out, "-obfuscate", "-playground")
+	// Service workers need a secure context: 127.0.0.1 counts as one.
+	runPlaywright(t, proj, base)
+}
+
+// ---------------------------------------------------------------------------
+// G14 — WebAssembly (WASI) modules run as sandboxed MelCGI handlers.
+// ---------------------------------------------------------------------------
+
+func TestG14_WASIHandlers(t *testing.T) {
+	requireBinaries(t)
+	src := t.TempDir()
+	index, err := os.ReadFile(filepath.Join(repoRoot, "testsites", "wasi", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, src, "index.html", index)
+	cmd := exec.Command("go", "build", "-o", filepath.Join(src, "hello.html.wasi"), "./testsites/wasi/src")
+	cmd.Dir = repoRoot
+	cmd.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm", "CGO_ENABLED=0")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("build WASI module: %v\n%s", err, out)
+	}
+	out := filepath.Join(t.TempDir(), "site")
+	melc(t, nil, "build", "-o", out, src)
+	base := startServer(t, out, "-wasi")
+
+	r1 := get(t, base+"/hello.html?from=g14")
+	if r1.Status != 200 || !bytes.Contains(r1.Body, []byte("<h1>Hello from WASI</h1>")) ||
+		!bytes.Contains(r1.Body, []byte("<td>QUERY_STRING</td><td>from=g14</td>")) {
+		t.Fatalf("WASI page: %d %s", r1.Status, r1.Body)
+	}
+	r2 := get(t, base+"/hello.html?from=g14")
+	if bytes.Equal(r1.Body, r2.Body) {
+		t.Error("the handler should run per request (time and random differ)")
+	}
+	if r := get(t, base+"/"); r.Status != 200 || r.Header.Get("X-Powered-By") != "Malbolge" {
+		t.Errorf("index: %d %v", r.Status, r.Header)
+	}
+	if r := get(t, base+"/hello.html.wasi"); r.Status != 404 {
+		t.Errorf("module bytes served: %d", r.Status)
+	}
+}
