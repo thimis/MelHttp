@@ -484,7 +484,9 @@ func TestG10_FrameworkPresets(t *testing.T) {
 
 func TestG11_RepoHygiene(t *testing.T) {
 	out := run(t, repoRoot, time.Minute, "git", "ls-files")
-	forbidden := regexp.MustCompile(`(^|/)(\.claude/|CLAUDE(\.local)?\.md$|\.mcp\.json$|\.env$|\.env\.|node_modules/|dist/|id_(rsa|ed25519|ecdsa|dsa))|\.(pem|key|p12|pfx|jks|kdbx)$`)
+	// Build output is only dist/ at the root and the test sites' dist/
+	// folders; tools/dist is source code and must be tracked.
+	forbidden := regexp.MustCompile(`(^|/)(\.claude/|CLAUDE(\.local)?\.md$|\.mcp\.json$|\.env$|\.env\.|node_modules/|id_(rsa|ed25519|ecdsa|dsa))|^dist/|^testsites/.*/dist/|\.(pem|key|p12|pfx|jks|kdbx)$`)
 	for _, f := range strings.Split(strings.TrimSpace(out), "\n") {
 		if f != "" && forbidden.MatchString(f) && !strings.HasSuffix(f, ".env.example") {
 			t.Errorf("tracked file must not be published: %s", f)
@@ -620,6 +622,12 @@ func npxCmd() string {
 
 func isWindows() bool { return os.PathSeparator == '\\' }
 
+// lastLine returns the last non-empty line of a command's output.
+func lastLine(out string) string {
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
+}
+
 // ---------------------------------------------------------------------------
 // G12 — HTTPS with automatic certificates: melhttpd gets a certificate from a
 // real ACME CA (Pebble, Let's Encrypt's test server, in Docker) and serves it.
@@ -631,10 +639,14 @@ func TestG12_ACMECertificates(t *testing.T) {
 	}
 	requireBinaries(t)
 	tmp := t.TempDir()
-	id := strings.TrimSpace(run(t, repoRoot, 5*time.Minute, "docker", "run", "-d", "--rm",
+	// Pull first: on a machine without the image, "docker run" prints pull
+	// progress before the container ID (run captures stdout and stderr).
+	const pebble = "ghcr.io/letsencrypt/pebble:2.7.0"
+	run(t, repoRoot, 10*time.Minute, "docker", "pull", pebble)
+	id := lastLine(run(t, repoRoot, 5*time.Minute, "docker", "run", "-d", "--rm",
 		"-e", "PEBBLE_VA_ALWAYS_VALID=1", "-e", "PEBBLE_VA_NOSLEEP=1",
 		"-p", "127.0.0.1:14000:14000", "-p", "127.0.0.1:15000:15000", // Pebble advertises URLs on these ports
-		"ghcr.io/letsencrypt/pebble:2.7.0", "-config", "test/config/pebble-config.json"))
+		pebble, "-config", "test/config/pebble-config.json"))
 	t.Cleanup(func() { exec.Command("docker", "rm", "-f", id).Run() })
 	port := func(p string) string {
 		out := strings.TrimSpace(run(t, repoRoot, time.Minute, "docker", "port", id, p))
