@@ -127,6 +127,7 @@ func (t *lag1Tables) fill(r int, seen *bitset) {
 // lag1Chunk compiles the longest prefix of data that fits one lag-1 program.
 // Every byte of data must be lag-1 printable.
 func (e *encoder) lag1Chunk(data []byte) (int, []byte) {
+	e.randomizePrefix(39)
 	t := getLag1()
 	ops := []malbolge.Op(nil)
 	s := lag1Start()

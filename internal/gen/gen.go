@@ -157,6 +157,9 @@ type encoder struct {
 	rng   *rand.Rand
 	buf   [16]uint8 // scratch for depth-first searches
 	sweep sweepSearch
+	// prefix, when set, replaces prefixOps for the chunk being built (seeded
+	// randomization of the cells the machine never executes).
+	prefix []malbolge.Op
 }
 
 // lag1MinRun is the shortest run of lag-1-printable bytes worth its own
@@ -266,7 +269,11 @@ func (e *encoder) assemble(ops []malbolge.Op) []byte {
 		pos++
 	}
 	for i := range prefixLen {
-		emit(malbolge.Op(prefixOps[i]))
+		op := malbolge.Op(prefixOps[i])
+		if e.prefix != nil {
+			op = e.prefix[i]
+		}
+		emit(op)
 	}
 	for _, op := range ops {
 		emit(op)
@@ -283,5 +290,23 @@ func (e *encoder) longRunAhead(l1 *lag1Tables, data []byte) func(i int) bool {
 		}
 		rest := data[i:]
 		return lag1Run(l1, rest[:min(len(rest), lag1MinRun)]) >= lag1MinRun
+	}
+}
+
+// randomizePrefix chooses, when seeded, random instructions for the prefix
+// cells that never execute: cells 3..last. Cells 0–2 set the machine up and
+// cell 40 is data, so they stay; tape chunks also read cells 34–41 as their
+// precomputed stream, so they pass last = 33.
+func (e *encoder) randomizePrefix(last int) {
+	e.prefix = nil
+	if e.rng == nil {
+		return
+	}
+	e.prefix = make([]malbolge.Op, prefixLen)
+	for i := range prefixLen {
+		e.prefix[i] = malbolge.Op(prefixOps[i])
+		if i >= 3 && i <= last {
+			e.prefix[i] = malbolge.Ops[e.rng.IntN(len(malbolge.Ops))]
+		}
 	}
 }

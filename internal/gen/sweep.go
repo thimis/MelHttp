@@ -73,6 +73,7 @@ func (g *region) next(st swState, mv uint8, write bool) (swState, int) {
 // number of bytes consumed (0 if the chunk could not print its first sweep
 // byte) and the program source. stop reports whether to end before data[i].
 func (e *encoder) sweepChunk(data []byte, stop func(i int) bool) (int, []byte) {
+	e.randomizePrefix(39)
 	tl := e.tape
 	l1 := getLag1()
 

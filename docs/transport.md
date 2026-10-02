@@ -59,9 +59,12 @@ D'`A@?>=<;:9876543210/.-,+*)('&%$#"!~}|{)yxwpun4lTj0Qmled*ba`&dcbaZYX|?[=<XWPtTM
   one at random for each request, so it doesn't recompile on every hit.
 - Dynamic responses get a fresh encoding every time.
 - Error responses (404 and so on) are sent as usual.
-- Every program begins with the same fixed 42-cell prefix (the `D'`A@?>=<;:98…` that
-  sets up the machine), so encoded responses are easy to recognise as MelHttp traffic.
-  Again: obfuscation, not secrecy.
+- Each program starts with a 42-cell prefix that sets up the machine. With a
+  seed, which the transport always uses, the 37 cells that never execute get
+  random instructions, so prefixes differ between responses (8³⁷ possibilities).
+  The first three characters, `D'``, are fixed by the setup. A determined
+  observer can still recognise Malbolge, because this is obfuscation, not
+  secrecy.
 
 Encoded bodies are about 7–11× larger than the original. gzip, applied when the
 browser accepts it, reduces that substantially. Decoding takes milliseconds:

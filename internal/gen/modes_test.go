@@ -202,3 +202,27 @@ func TestSweepRegionMatchesVM(t *testing.T) {
 type byteSink struct{ b *[]byte }
 
 func (s byteSink) WriteByte(c byte) error { *s.b = append(*s.b, c); return nil }
+
+// TestSeededPrefixesVary: with a seed, the never-executed prefix cells are
+// random, so encoded output is harder to fingerprint, and still correct.
+func TestSeededPrefixesVary(t *testing.T) {
+	data := []byte("same content, different look ✓ \x00\xa9")
+	prefixes := map[string]bool{}
+	for seed := uint64(1); seed <= 8; seed++ {
+		for _, opt := range []Options{{Seed: seed}, {Seed: seed, noSweep: true}} {
+			chunks := roundTrip(t, data, opt)
+			src := strings.Join(strings.Fields(string(chunks[0])), "")
+			if !strings.HasPrefix(src, "D'`") {
+				t.Fatalf("cells 0-2 must stay fixed: %q", src[:3])
+			}
+			prefixes[src[:prefixLen]] = true
+		}
+	}
+	if len(prefixes) < 15 {
+		t.Errorf("16 seeded programs have only %d distinct prefixes", len(prefixes))
+	}
+	unseeded := roundTrip(t, data, Options{})
+	if got := strings.Join(strings.Fields(string(unseeded[0])), "")[:prefixLen]; got[3:10] != "A@?>=<;" {
+		t.Errorf("unseeded prefix changed: %q", got)
+	}
+}

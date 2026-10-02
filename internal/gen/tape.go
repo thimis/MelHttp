@@ -135,6 +135,7 @@ const tapeOverhead = prefixLen + 94 + 3
 // moves. It returns how many bytes it consumed, how many content cells it
 // used, and the source. stop reports whether to end the chunk before data[i].
 func (e *encoder) tapeChunk(tl *tapeLayout, data []byte, T int, stop func(i int) bool) (int, int, []byte) {
+	e.randomizePrefix(33)
 	r := (prefixLen + T) % 94
 	ops := make([]malbolge.Op, 0, 2*T+tapeOverhead)
 	for _, mv := range tl.moves[:T] {
