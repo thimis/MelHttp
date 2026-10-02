@@ -33,6 +33,7 @@ programs in a sandboxed VM to answer requests.
 | `internal/webvm`, `cmd/melwasm` | The VM, decoder and generator compiled to WebAssembly, plus the service worker and playground served under `/_melhttp/`. |
 | `internal/wasi` | WebAssembly (WASI) MelCGI handlers in a wazero sandbox (see [wasi.md](wasi.md)). |
 | `internal/tlsutil` | HTTPS: certificate reloading, ACME (Let's Encrypt), self-signed certificates. |
+| `internal/build` | `melc build` and `melc watch`: framework presets, incremental in-place builds. |
 
 ## How a site maps to URLs
 

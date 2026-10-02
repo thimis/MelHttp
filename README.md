@@ -2,129 +2,92 @@
 
 A web server where **every byte you serve is printed by a [Malbolge](https://en.wikipedia.org/wiki/Malbolge) program**, the esoteric language designed in 1998 to be the hardest to program in.
 
-It serves real sites: the repository includes an Angular Material app, React and Vue apps, and a classic multi-page site. Their HTML, JavaScript, CSS, fonts and images are all compiled to Malbolge and run in a sandboxed VM. In browser tests they work exactly like the originals, and the cached pages are served faster than Go's own static file server.
+It serves real sites: the repository includes an Angular Material app, React and Vue apps, and a classic multi-page site. Their HTML, JavaScript, CSS, fonts and images are all compiled to Malbolge and run in a sandboxed VM. In browser tests they work exactly like the originals, and cached pages are served faster than Go's own static file server.
 
 ## How it works
 
-1. **`melc build`** compiles every file of your site (including binary files) into Malbolge programs that print it. Each program first prints a small CGI-style header. Large files become several programs ("chunks"). Every program is run once to verify it before it is written. → [generator](docs/generator.md)
+1. **`melc build`** compiles every file of your site, binary files included, into Malbolge programs that print it. Each program first prints a small CGI-style header. Large files become several programs ("chunks"), and every program is run once to verify it before it is written. → [generator](docs/generator.md)
 2. **`melhttpd`** maps URLs to those programs and runs them in an in-process Malbolge VM that matches the original 1998 interpreter. The VM is a perfect sandbox: a program can only read stdin and write stdout. → [VM](docs/malbolge-vm.md)
 3. Programs talk to the server through **MelCGI**, a strict CGI-like contract: the request goes in on stdin, and the response comes back on stdout. → [MelCGI](docs/melcgi.md)
-4. Programs that don't read their input are run once at startup and cached with ETags and gzip. Serving is then as fast as a normal static server. → [architecture](docs/architecture.md), [performance](docs/performance.md)
+4. Programs that don't read their input run once at startup and are then served from memory with ETags and gzip. → [architecture](docs/architecture.md), [performance](docs/performance.md)
 
-Extras: HTTPS with automatic Let's Encrypt certificates, an optional **Malbolge transport** (pages travel to the browser as Malbolge programs and the browser runs them), a browser **playground**, and **WASI** handlers for WebAssembly modules.
+Also included:
+
+- **HTTPS:** automatic Let's Encrypt certificates.
+- **Malbolge transport:** pages travel to the browser *as Malbolge programs*, and the browser runs them.
+- **Playground:** an in-browser Malbolge playground.
+- **WASI handlers:** WebAssembly modules as sandboxed handlers.
+- **Operations:** `melc watch` for development, Prometheus metrics, and a native Windows service.
 
 ## Setup
 
-### Option A: prebuilt binaries
-Download the archive for your OS and CPU (Linux, Windows, macOS or FreeBSD; amd64 or arm64), unpack it, and put `melhttpd` and `melc` on your `PATH`.
+Single executables with no dependencies, for **Linux, Windows, macOS and FreeBSD** on **x86-64 and ARM64**.
 
-### Option B: from source
-Requires [Go 1.26+](https://go.dev/dl/) (`winget install GoLang.Go`, `brew install go`, or your package manager).
-
-```bash
-git clone https://github.com/thimis/MelHttp.git && cd MelHttp
-go build -o bin/ ./cmd/melc ./cmd/melhttpd        # bin/melc, bin/melhttpd (.exe on Windows)
-go run ./tools/dist                                # optional: release archives for all 8 platforms in dist/
-```
-
-### Option C: Docker
-```bash
-docker compose up --build -d --wait
-```
-This builds the image (about 53 MB, distroless, non-root) and starts eight demo sites:
-
-| Port | Site |
+| Method | |
 |---|---|
-| 8080 | Angular |
-| 8081 | classic |
-| 8082 | MelCGI demos |
-| 8083 | hello |
-| 8084 | React |
-| 8085 | Vue |
-| 8086 | Malbolge transport demo (reload once) and playground |
-| 8087 | WASI handlers (Go compiled to WebAssembly) |
+| **Prebuilt binaries** | Download the archive for your platform from the [releases](https://github.com/thimis/MelHttp/releases), unpack it, and put `melc` and `melhttpd` on your `PATH`. |
+| **Docker** | `docker compose up --build -d --wait` starts eight demo sites (ports 8080–8087). After a release: `docker run -p 8080:8080 ghcr.io/thimis/melhttp`. |
+| **From source** (Go 1.26+) | `git clone https://github.com/thimis/MelHttp && cd MelHttp && go generate ./internal/webvm && go build -o bin/ ./cmd/melc ./cmd/melhttpd` |
+
+**Step-by-step guides for every OS:** [docs/install.md](docs/install.md). **Putting a site online** (Linux server, Docker, Windows service, macOS, FreeBSD, reverse proxies, Kubernetes): [docs/hosting.md](docs/hosting.md).
 
 ## Usage
 
 ```bash
-melc build -o site ./my-site          # compile a folder of static files
-melhttpd -root site -addr :8080       # serve it → http://localhost:8080
+melc build -o site ./my-site                  # compile a folder of static files to Malbolge
+melhttpd -root site                           # serve it on http://localhost:8080
+melc watch -serve :8080 ./my-site             # or: rebuild and serve on every change
+```
+
+For HTTPS, add your domain; ports 80 and 443 must reach the server:
+
+```bash
+melhttpd -root site -addr :80 -tls-addr :443 -acme-domains example.com -acme-email you@example.com
 ```
 
 Every response from a program carries `X-Powered-By: Malbolge` and `X-Malbolge-Steps: <instructions executed>`.
 
-Useful `melhttpd` flags (each can also be set with a `MELHTTP_*` environment variable):
-
 | Flag | Default | Meaning |
 |---|---|---|
-| `-root` | `site` | site directory built by `melc build` |
-| `-addr` | `:8080` | listen address |
-| `-spa` | off | serve `index.html` for unknown paths (single-page apps; usually set by `melc build`) |
-| `-expose-source` | off | let visitors read the Malbolge behind any page at `/_source/<path>` |
-| `-no-cache` | off | run the VM on every request |
-| `-max-steps`, `-timeout`, `-max-body` | 2e9, 30s, 1 MiB | per-request limits |
-| `-healthcheck` | | exit 0 if a server on `-addr` is healthy (for Docker) |
-| `-acme-domains`, `-tls-cert`/`-tls-key`, `-tls-self-signed` | off | enable HTTPS on `-tls-addr` (`:8443`) |
-| `-obfuscate` | off | send pages to browsers *as Malbolge programs*, decoded by a service worker running the VM in WebAssembly (obfuscation, not encryption) → [docs/transport.md](docs/transport.md) |
-| `-playground` | off | in-browser Malbolge playground at `/_melhttp/playground.html` |
-| `-wasi` | off | run WebAssembly (`*.wasi`) modules as sandboxed CGI handlers → [docs/wasi.md](docs/wasi.md) |
+| `-root` / `-addr` | `site` / `:8080` | site directory, listen address |
+| `-acme-domains`, `-tls-cert`/`-tls-key`, `-tls-self-signed` | off | HTTPS on `-tls-addr` (`:8443`); plain HTTP then redirects; `-hsts 8760h` adds HSTS |
+| `-spa` | off | serve `index.html` for unknown paths (usually set by `melc build`) |
+| `-obfuscate` / `-playground` | off | Malbolge transport for browsers / in-browser playground → [transport](docs/transport.md) |
+| `-wasi` | off | run `*.wasi` WebAssembly handlers → [WASI](docs/wasi.md) |
+| `-metrics-addr` | off | Prometheus metrics on a private address |
+| `-service install` | | Windows: install as a service → [Windows](deploy/windows.md) |
 
-All flags, plus systemd, launchd and Windows setup: [docs/deployment.md](docs/deployment.md). **HTTPS:** `-acme-domains example.com` gets free, automatically renewed Let's Encrypt certificates (ports 80 and 443 must reach the server), `-tls-cert`/`-tls-key` serves your own, and `-tls-self-signed` is for local testing. Plain HTTP then redirects to HTTPS, and `-hsts 8760h` adds HSTS. Details: [docs/deployment.md#https](docs/deployment.md#https).
+Every flag also has a `MELHTTP_*` environment variable. The full list is in [docs/deployment.md](docs/deployment.md).
 
 ## Compiling `.mb` files
 
-**A whole site.** `melc build` compiles a folder, or a framework project via presets:
-
 ```bash
-melc build -o site ./public                                # any folder of static files
-melc build --preset auto --run-build -o site ./my-app      # detect the framework, run its build, compile the output
-melc build --preset angular -o site ./my-angular-app       # or name it: angular, vite, react, vue, svelte,
-                                                           # cra, next, nuxt, astro, gatsby, hugo, jekyll, static
+melc build --preset auto --run-build -o site ./my-app   # Angular, React, Vue, Svelte, Next, Nuxt, Astro, Gatsby, Hugo, Jekyll…
+melc gen page.html                                      # one file → page.html.mb (a chunk directory if large)
+melc gen -raw -o hello.mb hello.txt                     # no CGI header: the program prints only the file
+melc run hello.mb                                       # run any Malbolge program (stdin → stdout)
+melc check site/index.html.mb                           # validate without running
 ```
 
-- **Presets** know where each framework writes its output and whether it needs SPA fallback. → [docs/frameworks.md](docs/frameworks.md)
-- **Rebuilds** are incremental: only changed files are recompiled.
-- **Safety:** `-o` is only ever replaced if melc created it.
+On disk, `about.html.mb`, or a chunk directory `about.html.mb/000.mb, 001.mb, …`, serves `/about.html`. Hand-written programs that print only a body are named `*.raw.mb`.
 
-**A single file.**
+Output costs about 7.5 cells per byte for text and 8–11 for binary or UTF-8. Rebuilds are incremental and happen in place, even while the site is served.
 
-```bash
-melc gen page.html                  # → page.html.mb (or a page.html.mb/ chunk directory if large)
-melc gen -o site/about.html.mb about.html
-melc gen -raw -o hello.mb hello.txt # no CGI header: the program prints only the file
-melc gen -seed 42 page.html         # randomized code with the same output
-```
-
-**Running and checking programs.**
-
-```bash
-melc run hello.mb                   # run any Malbolge program (stdin → program → stdout)
-echo "Hi" | melc run -stats cat.mb  # -stats prints instructions executed; -steps N sets a limit
-melc check site/index.html.mb       # validate a program without running it
-```
-
-**Layout on disk.** The server derives each URL from the file name:
-
-| On disk | URL |
-|---|---|
-| `about.html.mb` | `/about.html` |
-| `about.html.mb/000.mb`, `001.mb`, … | `/about.html` |
-| `echo.txt.raw.mb` | `/echo.txt` |
-
-- **Chunk directories:** the programs run in order and their outputs are concatenated.
-- **`.raw.mb`:** a raw program; its whole output is the body. Use this for hand-written Malbolge that reads the request.
+**Full guide:** [docs/generating.md](docs/generating.md) (frameworks: [docs/frameworks.md](docs/frameworks.md)).
 
 ## How it's tested
 
-The tests were written first, as a ladder of goals that build up to the full product, and every goal passes. The goals cover:
+The tests were written first, as a ladder of 15 goals that build up to the full product, and every goal passes. They include:
 
-- **VM:** a differential test against the original C interpreter.
-- **Converter:** completeness proofs that every byte value can be printed.
-- **End to end:** byte-for-byte crawls of every test site.
-- **Browsers:** Playwright tests of the Angular, React and Vue apps served from Malbolge.
-- **Hardening and builds:** fuzzing, the race detector, Docker, and cross-builds for 8 platforms and WebAssembly.
+- a differential test of the VM against the original C interpreter;
+- completeness proofs for the converter;
+- byte-for-byte crawls of every test site;
+- Playwright tests of the Angular, React and Vue apps and of the Malbolge transport in Chromium;
+- a real Let's Encrypt-style certificate from an ACME test CA;
+- WASI handlers, a Windows service, Docker;
+- fuzzing, the race detector, fault injection, and cross-builds for 8 platforms and WebAssembly.
 
-See [docs/testing.md](docs/testing.md) and [docs/security.md](docs/security.md).
+See [docs/testing.md](docs/testing.md) and [docs/security.md](docs/security.md). All documentation: [docs/](docs/README.md).
 
 ## Credits
 

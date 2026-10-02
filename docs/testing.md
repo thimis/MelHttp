@@ -29,6 +29,7 @@ the complete product.
 | G12 | HTTPS with automatic certificates: melhttpd gets a real certificate from Pebble, Let's Encrypt's ACME test CA (Docker), serves the site with it, refuses unlisted names, and redirects HTTP. |
 | G13 | The Malbolge transport and the browser VM, in real Chromium: the service worker installs, the wire carries only Malbolge text, pages, UTF-8 and images decode, and the playground runs and compiles programs. |
 | G14 | WASI: a Go program compiled to `wasip1` runs per request as a sandboxed MelCGI handler next to Malbolge pages. |
+| G15 | Windows service: installs, starts, serves, stops and removes a real service (needs elevation; runs on GitHub's Windows runners). |
 
 ## Layers of assurance for the converter
 

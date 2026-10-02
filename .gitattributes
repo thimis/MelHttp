@@ -84,3 +84,4 @@ testdata/corpus/**  binary
 *.woff2  binary
 *.ttf    binary
 *.wasm   binary
+deploy/freebsd/melhttpd text eol=lf

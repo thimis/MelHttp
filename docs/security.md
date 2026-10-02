@@ -119,11 +119,21 @@ files, an empty environment and no sockets. Memory is capped (`-wasi-memory-mb`)
 and the module is terminated when it hits the time or output limit. Module bytes
 are never served. See [wasi.md](wasi.md).
 
+## Metrics (opt-in, `-metrics-addr`)
+
+Metrics are only served on their own listener, never on the public site. Bind it to
+localhost or a private network: the counters reveal traffic volume and timings.
+
 ## Browser assets (opt-in, `-obfuscate`, `-playground`)
 
 `/_melhttp/` is only served when one of these flags is on. The service worker
-only intercepts same-origin GET requests and passes anything it cannot decode
-through unchanged. Encoded responses are `Cache-Control: no-store`.
+only intercepts same-origin requests, and passes anything it cannot decode or
+encode through unchanged. Encoded responses are `Cache-Control: no-store`.
+Encoded request bodies have their own limits:
+
+- up to 64× `-max-body` on the wire;
+- a step budget while decoding;
+- a decoded size within `-max-body`.
 
 ## Not a security feature
 

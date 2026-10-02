@@ -32,6 +32,9 @@ environment.
 | `-wasi-memory-mb` | `MELHTTP_WASI_MEMORY_MB` | 64 | memory per WASI run |
 | `-hsts` | `MELHTTP_HSTS` | 0 | HSTS max-age on HTTPS responses |
 | `-metrics-addr` | `MELHTTP_METRICS_ADDR` | off | Prometheus metrics at `/metrics` on a **private** address, e.g. `127.0.0.1:9090` |
+| `-log-file` | `MELHTTP_LOG_FILE` | stderr | append logs to a file (services have no console) |
+| `-service` | — | | Windows: `install`, `uninstall`, `start`, `stop` the service ([windows.md](../deploy/windows.md)) |
+| `-service-name` | — | `melhttpd` | Windows service name (run several sites side by side) |
 | `-healthcheck` | — | | probe `-addr` and exit 0/1 (for container health checks) |
 
 `GET /healthz` returns `200 ok`.
@@ -54,19 +57,17 @@ docker run --rm -p 8080:8080 -v "$PWD/site:/srv/site:ro" -e MELHTTP_ROOT=/srv/si
 
 Multi-arch images: `docker buildx build --platform linux/amd64,linux/arm64 -t you/melhttp --push .`
 
-## Linux (systemd)
+## Services on each OS
 
-See [`deploy/melhttpd.service`](../deploy/melhttpd.service). It is a hardened
-unit with a dedicated user, read-only paths and a minimal capability set.
+Step-by-step setups for every OS are in [hosting.md](hosting.md):
 
-## macOS (launchd)
-
-See [`deploy/com.melhttp.melhttpd.plist`](../deploy/com.melhttp.melhttpd.plist).
-
-## Windows
-
-See [`deploy/windows.md`](../deploy/windows.md) for Task Scheduler, NSSM and
-the firewall rule.
+| OS | Service setup |
+|---|---|
+| Linux | [`deploy/melhttpd.service`](../deploy/melhttpd.service) (systemd) |
+| macOS | [`deploy/com.melhttp.melhttpd.plist`](../deploy/com.melhttp.melhttpd.plist) (launchd) |
+| Windows | `melhttpd -service install` ([windows.md](../deploy/windows.md)) |
+| FreeBSD | [`deploy/freebsd/melhttpd`](../deploy/freebsd/melhttpd) (rc.d) |
+| Kubernetes | [`deploy/kubernetes.yaml`](../deploy/kubernetes.yaml) |
 
 ## Release archives
 

@@ -1,0 +1,49 @@
+# Minimal Kubernetes deployment of the MelHttp image (ghcr.io/thimis/melhttp
+# after a tagged release, or your own build). TLS is usually terminated by the
+# Ingress controller; melhttpd serves plain HTTP on 8080.
+#   kubectl apply -f deploy/kubernetes.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: melhttp
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: melhttp }
+  template:
+    metadata:
+      labels: { app: melhttp }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: melhttpd
+          image: ghcr.io/thimis/melhttp:latest
+          env:
+            - { name: MELHTTP_ROOT, value: /srv/sites/angular }
+            - { name: MELHTTP_METRICS_ADDR, value: ":9090" }
+          ports:
+            - { name: http, containerPort: 8080 }
+            - { name: metrics, containerPort: 9090 }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 100m, memory: 64Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: melhttp
+spec:
+  selector: { app: melhttp }
+  ports:
+    - { name: http, port: 80, targetPort: http }
