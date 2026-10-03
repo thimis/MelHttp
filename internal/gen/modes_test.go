@@ -1,0 +1,228 @@
+package gen
+
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"github.com/thimis/MelHttp/internal/malbolge"
+)
+
+// TestLag1Completeness: lag-1 chunks can print exactly the 201 lag-1-printable
+// bytes (all of ASCII among them) from every state, and the tables agree with
+// the real VM.
+func TestLag1Completeness(t *testing.T) {
+	tb := getLag1()
+	n := 0
+	for b := range 256 {
+		if tb.printable[b] {
+			n++
+		}
+	}
+	if n != 201 {
+		t.Fatalf("%d printable bytes, want 201", n)
+	}
+	for b := range 128 {
+		if !tb.printable[b] {
+			t.Fatalf("ASCII byte %#x not lag-1 printable", b)
+		}
+	}
+	worst := 0
+	for r := range nResets {
+		for b := range 256 {
+			if tb.printable[b] {
+				if tb.fbLen[r][b] == unreachable {
+					t.Fatalf("reset %d cannot reach printable byte %#x", r, b)
+				}
+				worst = max(worst, int(tb.fbLen[r][b]))
+			}
+		}
+	}
+	t.Logf("lag-1: worst-case %d cells for one byte from any state", worst)
+	// Model vs VM: print every printable byte after a run of setup bytes.
+	e := &encoder{opt: Options{}}
+	e.opt, _ = e.opt.withDefaults()
+	var data []byte
+	for b := range 256 {
+		if tb.printable[b] {
+			data = append(data, byte(b), 'x', byte(b))
+		}
+	}
+	n, src := e.lag1Chunk(data)
+	if n != len(data) {
+		t.Fatalf("lag-1 chunk took %d of %d bytes", n, len(data))
+	}
+	p, err := malbolge.Load(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _, err := p.RunBytes(context.Background(), nil, malbolge.Limits{})
+	if err != nil || string(out) != string(data) {
+		t.Fatalf("lag-1 program printed %q, err %v", out, err)
+	}
+}
+
+// TestTapeOnRealVM checks the tape layout against the real machine for
+// several tape lengths: after the 'j', d == sStar, a matches the model, and
+// the cells content will read hold exactly the stream values.
+func TestTapeOnRealVM(t *testing.T) {
+	tl, err := getTape()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("tape start cell %d, worst padding %d, stream %d values", tl.sStar, maxPad(tl), len(tl.stream))
+	e := &encoder{tape: tl}
+	e.opt, _ = Options{}.withDefaults()
+	never := func(int) bool { return false }
+	for _, T := range []int{64, 65, 200, 1000, 5001, tapeMax} {
+		_, _, src := e.tapeChunk(tl, nil, T, never)
+		p, err := malbolge.Load(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m := p.NewMachine(nil, nil)
+		p0 := prefixLen + T + tl.pad[(prefixLen+T)%94] + 2
+		for m.C != p0 {
+			if err := m.Step(); err != nil || m.Halted {
+				t.Fatalf("T=%d: stopped at c=%d before content: %v", T, m.C, err)
+			}
+		}
+		if m.D != tl.sStar {
+			t.Fatalf("T=%d: d=%d after the jump, want %d", T, m.D, tl.sStar)
+		}
+		limit := prefixLen + T - 1 - tl.sStar
+		for i := range limit {
+			if m.Mem[tl.sStar+i] != tl.stream[i] {
+				t.Fatalf("T=%d: cell %d = %d, stream says %d", T, tl.sStar+i, m.Mem[tl.sStar+i], tl.stream[i])
+			}
+		}
+	}
+}
+
+func maxPad(tl *tapeLayout) int {
+	w := 0
+	for _, p := range tl.pad {
+		w = max(w, p)
+	}
+	return w
+}
+
+// TestTapeCompleteness is the converter's completeness proof for arbitrary
+// bytes. From any state the encoder can emit nops up to a reset ('*') whose
+// short paths print the wanted byte. For every stream index content can read
+// and every byte value, this finds that reset and bounds the cost, so every
+// byte is printable from every state and every input is compilable.
+func TestTapeCompleteness(t *testing.T) {
+	tl, err := getTape()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := tl.reach
+	const margin = 1024 // the last indices may run out of stream; chunks end there
+	worst, worstK, worstB, total, count := 0, 0, 0, 0, 0
+	for k := 0; k < len(r.any)-margin; k++ {
+		for b := range 256 {
+			kk := r.next(k, byte(b))
+			if kk < 0 {
+				t.Fatalf("byte %#x unreachable after stream index %d", b, k)
+			}
+			cost := (kk - k) + 1 + r.depth(kk, byte(b)) + 1
+			total += cost
+			count++
+			if cost > worst {
+				worst, worstK, worstB = cost, k, b
+			}
+		}
+	}
+	t.Logf("tape: worst %d cells for one byte (index %d, byte %#x); average fallback %.2f cells",
+		worst, worstK, worstB, float64(total)/float64(count))
+	if worst > 600 {
+		t.Errorf("worst case %d cells is too high", worst)
+	}
+}
+
+func TestASCIIUsesLag1Chunks(t *testing.T) {
+	text := []byte(strings.Repeat("function malbolge(x){return x*3+1;} // ascii only\n", 400))
+	chunks := roundTrip(t, text, Options{})
+	ratio := float64(cells(chunks)) / float64(len(text))
+	t.Logf("ASCII: %.2f cells/byte, %d chunks", ratio, len(chunks))
+	if ratio > 10 {
+		t.Errorf("ASCII costs %.2f cells/byte; lag-1 chunks should give < 10", ratio)
+	}
+}
+
+// TestTapeFallbackStillWorks forces the proven tape chunks that back up
+// sweep chunks, so the fallback stays covered.
+func TestTapeFallbackStillWorks(t *testing.T) {
+	data := []byte(strings.Repeat("tape fallback: \x00\xa9\xff Ünïcødé ✓ ", 200))
+	chunks := roundTrip(t, data, Options{noSweep: true})
+	ratio := float64(cells(chunks)) / float64(len(data))
+	sweep := roundTrip(t, data, Options{})
+	t.Logf("tape chunks %.1f cells/byte; sweep chunks %.1f cells/byte", ratio, float64(cells(sweep))/float64(len(data)))
+	if cells(sweep) >= cells(chunks) {
+		t.Error("sweep chunks should be smaller than tape chunks")
+	}
+}
+
+// TestSweepRegionMatchesVM runs a sweep chunk step by step on the real VM:
+// every forced 'j' must land d back on the region start.
+func TestSweepRegionMatchesVM(t *testing.T) {
+	tl, _ := getTape()
+	e := &encoder{tape: tl}
+	e.opt, _ = Options{}.withDefaults()
+	data := make([]byte, 3000)
+	for i := range data {
+		data[i] = byte(i*7 + i/3)
+	}
+	n, src := e.sweepChunk(data, func(int) bool { return false })
+	if n == 0 {
+		t.Fatal("sweep chunk made no progress")
+	}
+	p, err := malbolge.Load(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []byte
+	m := p.NewMachine(nil, byteSink{&out})
+	rewinds := 0
+	for !m.Halted {
+		if m.Op() == malbolge.OpMovD && m.Mem[m.D] == uint16(tl.sStar-1) {
+			rewinds++
+		}
+		if err := m.Step(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if string(out) != string(data[:n]) || rewinds < 3 {
+		t.Fatalf("printed %d bytes (want %d), %d rewinds", len(out), n, rewinds)
+	}
+	t.Logf("%d bytes in one chunk with %d region sweeps", n, rewinds-1)
+}
+
+type byteSink struct{ b *[]byte }
+
+func (s byteSink) WriteByte(c byte) error { *s.b = append(*s.b, c); return nil }
+
+// TestSeededPrefixesVary: with a seed, the never-executed prefix cells are
+// random, so encoded output is harder to fingerprint, and still correct.
+func TestSeededPrefixesVary(t *testing.T) {
+	data := []byte("same content, different look ✓ \x00\xa9")
+	prefixes := map[string]bool{}
+	for seed := uint64(1); seed <= 8; seed++ {
+		for _, opt := range []Options{{Seed: seed}, {Seed: seed, noSweep: true}} {
+			chunks := roundTrip(t, data, opt)
+			src := strings.Join(strings.Fields(string(chunks[0])), "")
+			if !strings.HasPrefix(src, "D'`") {
+				t.Fatalf("cells 0-2 must stay fixed: %q", src[:3])
+			}
+			prefixes[src[:prefixLen]] = true
+		}
+	}
+	if len(prefixes) < 15 {
+		t.Errorf("16 seeded programs have only %d distinct prefixes", len(prefixes))
+	}
+	unseeded := roundTrip(t, data, Options{})
+	if got := strings.Join(strings.Fields(string(unseeded[0])), "")[:prefixLen]; got[3:10] != "A@?>=<;" {
+		t.Errorf("unseeded prefix changed: %q", got)
+	}
+}

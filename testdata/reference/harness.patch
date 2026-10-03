@@ -1,0 +1,37 @@
+--- malbolge.c	2026-10-01 18:47:34.626977400 -0500
++++ harness.c	2026-10-01 18:47:34.664589400 -0500
+@@ -22,7 +22,6 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <ctype.h>
+-#include <malloc.h>
+ #include <string.h>
+ 
+ #ifdef __GNUC__
+@@ -106,9 +105,13 @@
+ {
+   unsigned short a = 0, c = 0, d = 0;
+   int x;
++  long long steps = 0;
++  long long maxsteps = getenv( "MAL_STEPS" ) ? atoll( getenv( "MAL_STEPS" ) ) : 0;
+   for (;;)
+   {
+-    if ( mem[c] < 33 || mem[c] > 126 ) continue;
++    if ( mem[c] < 33 || mem[c] > 126 ) { fflush( stdout ); fprintf( stderr, "INVALID %lld\n", steps ); exit( 4 ); }
++    if ( maxsteps && steps >= maxsteps ) { fflush( stdout ); fprintf( stderr, "LIMIT %lld\n", steps ); exit( 3 ); }
++    steps++;
+     switch ( xlat1[( mem[c] - 33 + c ) % 94] )
+     {
+       case 'j': d = mem[d]; break;
+@@ -128,9 +131,9 @@
+ #endif
+         if ( x == EOF ) a = 59048; else a = x;
+         break;
+-      case 'v': return;
++      case 'v': fflush( stdout ); fprintf( stderr, "HALT %lld\n", steps ); return;
+     }
+-    mem[c] = xlat2[mem[c] - 33];
++    if ( mem[c] >= 33 && mem[c] <= 126 ) mem[c] = xlat2[mem[c] - 33];
+     if ( c == 59048 ) c = 0; else c++;
+     if ( d == 59048 ) d = 0; else d++;
+   }

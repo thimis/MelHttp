@@ -1,0 +1,46 @@
+<mat-toolbar class="app-toolbar">
+  <button matIconButton type="button" (click)="sidenav.toggle()" aria-label="Toggle navigation">
+    <mat-icon>menu</mat-icon>
+  </button>
+  <a class="brand" routerLink="/dashboard">MelHttp Showcase</a>
+  <span class="spacer"></span>
+  <button
+    matIconButton
+    type="button"
+    class="theme-toggle"
+    (click)="theme.toggle()"
+    aria-label="Toggle theme"
+    [attr.aria-pressed]="theme.dark()"
+    [matTooltip]="theme.dark() ? 'Switch to light theme' : 'Switch to dark theme'"
+  >
+    <mat-icon>{{ theme.dark() ? 'light_mode' : 'dark_mode' }}</mat-icon>
+  </button>
+</mat-toolbar>
+
+<mat-sidenav-container class="shell">
+  <mat-sidenav #sidenav class="nav" [mode]="isHandset() ? 'over' : 'side'" [opened]="!isHandset()">
+    <nav aria-label="Main">
+      <mat-nav-list>
+        @for (link of links; track link.path) {
+          <a
+            mat-list-item
+            [routerLink]="link.path"
+            routerLinkActive
+            #rla="routerLinkActive"
+            [activated]="rla.isActive"
+            [attr.aria-current]="rla.isActive ? 'page' : null"
+            (click)="isHandset() && sidenav.close()"
+          >
+            <mat-icon matListItemIcon>{{ link.icon }}</mat-icon>
+            <span matListItemTitle>{{ link.label }}</span>
+          </a>
+        }
+      </mat-nav-list>
+    </nav>
+  </mat-sidenav>
+  <mat-sidenav-content>
+    <main class="content">
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

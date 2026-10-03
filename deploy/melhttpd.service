@@ -1,0 +1,40 @@
+# systemd unit for melhttpd (Linux).
+#   sudo install -m 0755 melhttpd /usr/local/bin/
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin melhttp
+#   sudo mkdir -p /srv/melhttp && sudo cp -r site /srv/melhttp/
+#   sudo cp melhttpd.service /etc/systemd/system/ && sudo systemctl enable --now melhttpd
+[Unit]
+Description=MelHttp — a web server whose pages are Malbolge programs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=melhttp
+Group=melhttp
+Environment=MELHTTP_ADDR=:8080
+Environment=MELHTTP_ROOT=/srv/melhttp/site
+Environment=MELHTTP_LOG_FORMAT=json
+ExecStart=/usr/local/bin/melhttpd
+Restart=on-failure
+RestartSec=2s
+# Bind ports below 1024 without root (remove if you use :8080 behind a proxy).
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+ReadOnlyPaths=/srv/melhttp
+
+[Install]
+WantedBy=multi-user.target

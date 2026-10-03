@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# PROVIDE: melhttpd
+# REQUIRE: LOGIN NETWORKING
+# KEYWORD: shutdown
+#
+# FreeBSD rc.d script for melhttpd.
+#   install -m 0755 melhttpd /usr/local/bin/ && install -m 0555 deploy/freebsd/melhttpd /usr/local/etc/rc.d/
+#   sysrc melhttpd_enable=YES melhttpd_flags="-root /usr/local/www/melhttp -addr :8080"
+#   service melhttpd start
+
+. /etc/rc.subr
+
+name="melhttpd"
+rcvar="melhttpd_enable"
+
+load_rc_config $name
+: ${melhttpd_enable:="NO"}
+: ${melhttpd_user:="www"}
+: ${melhttpd_flags:="-root /usr/local/www/melhttp -addr :8080"}
+: ${melhttpd_logfile:="/var/log/melhttpd.log"}
+
+pidfile="/var/run/${name}.pid"
+procname="/usr/local/bin/melhttpd"
+command="/usr/sbin/daemon"
+command_args="-f -P ${pidfile} -u ${melhttpd_user} ${procname} ${melhttpd_flags} -log-file ${melhttpd_logfile}"
+
+start_precmd="melhttpd_prestart"
+melhttpd_prestart()
+{
+	touch "${melhttpd_logfile}" && chown "${melhttpd_user}" "${melhttpd_logfile}"
+}
+
+run_rc_command "$1"

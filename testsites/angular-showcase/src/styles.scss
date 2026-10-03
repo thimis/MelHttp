@@ -1,0 +1,58 @@
+// Fonts are self-hosted via npm packages (see src/fonts.scss):
+//   @fontsource/roboto (latin 400/500) and material-icons (filled icon font).
+// No CDN or external network requests are made at runtime.
+@use '@angular/material' as mat;
+
+html {
+  height: 100%;
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$blue-palette,
+      ),
+      typography: Roboto,
+      density: 0,
+    )
+  );
+}
+
+body {
+  // Material 3 tokens use light-dark(); color-scheme selects which side applies.
+  color-scheme: light;
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+  margin: 0;
+  height: 100%;
+}
+
+body.dark-theme {
+  color-scheme: dark;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 12px;
+}
+
+h1 {
+  font: var(--mat-sys-headline-medium);
+}
+
+h2 {
+  font: var(--mat-sys-title-large);
+}
+
+.page-intro {
+  color: var(--mat-sys-on-surface-variant);
+  margin: 0 0 24px;
+  max-width: 70ch;
+}
+
+code,
+pre,
+.mono {
+  font-family: 'Cascadia Code', Consolas, 'SFMono-Regular', Menlo, monospace;
+}

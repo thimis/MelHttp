@@ -1,0 +1,62 @@
+name: release
+
+# Push a version tag to publish:
+#   git tag v0.1.0 && git push origin v0.1.0
+# This creates a GitHub Release with archives for every platform plus
+# SHA256SUMS, and pushes a multi-arch image to ghcr.io/<owner>/melhttp.
+# The tag must match internal/version (tools/dist checks). 0.x versions are
+# alpha and are published as pre-releases.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  archives:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: generate browser VM assets
+        run: go generate ./internal/webvm
+      - run: go test ./...
+      - run: go run ./tools/dist -version "${GITHUB_REF_NAME}"
+      - name: publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pre=
+          case "${GITHUB_REF_NAME}" in v0.*|*-*) pre=--prerelease ;; esac
+          gh release create "${GITHUB_REF_NAME}" dist/* --title "MelHttp ${GITHUB_REF_NAME}" --generate-notes $pre
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: image name (lower case)
+        id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/melhttp" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ github.ref_name }}
+          tags: |
+            ${{ steps.name.outputs.image }}:${{ github.ref_name }}
+            ${{ steps.name.outputs.image }}:latest

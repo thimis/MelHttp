@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd job for melhttpd (macOS).
+    sudo cp melhttpd /usr/local/bin/ && sudo mkdir -p /usr/local/var/melhttp && sudo cp -R site /usr/local/var/melhttp/
+    sudo cp com.melhttp.melhttpd.plist /Library/LaunchDaemons/
+    sudo launchctl bootstrap system /Library/LaunchDaemons/com.melhttp.melhttpd.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.melhttp.melhttpd</string>
+  <key>ProgramArguments</key>
+  <array><string>/usr/local/bin/melhttpd</string></array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>MELHTTP_ADDR</key><string>:8080</string>
+    <key>MELHTTP_ROOT</key><string>/usr/local/var/melhttp/site</string>
+    <key>MELHTTP_LOG_FORMAT</key><string>json</string>
+  </dict>
+  <key>UserName</key><string>nobody</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardErrorPath</key><string>/usr/local/var/log/melhttpd.log</string>
+</dict>
+</plist>

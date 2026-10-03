@@ -1,0 +1,112 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Unit tests and an end-to-end smoke test on every OS.
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        go: ["1.26.x", "stable"]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+      - name: generate browser VM assets
+        run: go generate ./internal/webvm
+      - name: gofmt
+        if: matrix.os == 'ubuntu-latest'
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - run: go vet ./...
+      - run: go test ./...
+      - name: secret / hygiene check
+        run: go run ./tools/precommit -all
+      - name: Windows service goal (install, start, serve, stop, remove)
+        if: runner.os == 'Windows'
+        run: go test -tags acceptance -run G15 -v ./acceptance
+      - name: smoke test (build a site, serve it, crawl it)
+        run: |
+          go build -o bin/ ./cmd/melc ./cmd/melhttpd
+          ./bin/melc build -o "$RUNNER_TEMP/site" testsites/classic
+          ./bin/melhttpd -root "$RUNNER_TEMP/site" -addr 127.0.0.1:8099 &
+          for i in $(seq 1 60); do ./bin/melhttpd -healthcheck -addr 127.0.0.1:8099 && break; sleep 1; done
+          go run ./tools/crawl -base http://127.0.0.1:8099 -src testsites/classic
+          kill %1
+
+  race:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - run: go generate ./internal/webvm
+      - run: go test -race ./...
+
+  # Static analysis and known-vulnerability scan.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - run: go generate ./internal/webvm
+      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - run: go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+
+  # The VM and generated programs against Ben Olmstead's reference interpreter (Docker).
+  reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - run: go test -tags reference ./internal/malbolge ./internal/gen
+
+  # The goal ladder: every acceptance goal, including frontends and Docker.
+  acceptance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: install Playwright browsers
+        run: |
+          go generate ./internal/webvm
+          for d in angular-showcase react-vite vue-vite obfuscated; do (cd testsites/$d && npm ci --no-audit --no-fund); done
+          (cd testsites/angular-showcase && npx playwright install --with-deps chromium)
+      - run: MELHTTP_DOCKER=1 go test -tags acceptance -timeout 60m -v ./acceptance
+
+  # Release archives for every platform (uploaded as a workflow artifact).
+  dist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - run: go run ./tools/dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: melhttp-dist
+          path: dist/

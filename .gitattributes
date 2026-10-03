@@ -61,3 +61,28 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# MelHttp
+###############################################################################
+*.go        text eol=lf
+*.mb        text eol=lf
+*.sh        text eol=lf
+# Byte-exact golden files and binary corpus must never be normalized.
+testdata/**/*.out   binary
+testdata/**/*.in    binary
+testdata/corpus/**  binary
+**/testdata/fuzz/** text eol=lf
+# Binary web assets anywhere in the repo.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.webp   binary
+*.ico    binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary
+*.wasm   binary
+deploy/freebsd/melhttpd text eol=lf
+*.ps1      text eol=crlf

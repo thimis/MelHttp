@@ -1,0 +1,1 @@
+:root{--fg:#1d1d1f;--bg:#fbfbfd}@media (prefers-color-scheme:dark){:root{--fg:#f5f5f7;--bg:#111}}body{margin:0;font:16px/1.5 system-ui,sans-serif;color:var(--fg);background:var(--bg)}h1::after{content:" ✓"}
