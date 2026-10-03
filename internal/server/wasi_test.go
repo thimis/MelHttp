@@ -42,7 +42,10 @@ func TestWASIHandlers(t *testing.T) {
 	writeFile(t, root, "app/hello.txt.wasi", wasiHandler(t))
 	writeFile(t, root, "raw.txt.raw.wasi", wasiHandler(t))
 	writeFile(t, root, "notwasm.txt.wasi", []byte("nope"))
-	s, ts := newTestServer(t, root, Config{WASI: true, Timeout: 2 * time.Second, MaxOutput: 1 << 20})
+	// A generous time limit: under -race on a small CI machine, the oom case
+	// can take seconds to reach its memory limit, and must fail as 500, not
+	// as a timeout. The timeout itself is checked below with a short limit.
+	s, ts := newTestServer(t, root, Config{WASI: true, Timeout: 30 * time.Second, MaxOutput: 1 << 20})
 	if st := s.Warm(t.Context()); st.Failed != 4 { // 3 broken Malbolge fixtures + notwasm.txt.wasi
 		t.Fatalf("warm-up: %+v", st)
 	}
@@ -62,10 +65,16 @@ func TestWASIHandlers(t *testing.T) {
 	if raw.status != 200 || !strings.HasPrefix(string(raw.body), "Content-Type: text/plain") {
 		t.Errorf("raw WASI: %d %q", raw.status, raw.body)
 	}
-	for q, want := range map[string]int{"loop": 503, "exit": 500, "oom": 500, "flood": 500} {
+	for q, want := range map[string]int{"exit": 500, "oom": 500, "flood": 500} {
 		if r := get(t, ts.URL+"/app/hello.txt?"+q); r.status != want {
 			t.Errorf("?%s = %d, want %d", q, r.status, want)
 		}
+	}
+	// A handler that never finishes hits the time limit: 503.
+	fast, tsFast := newTestServer(t, root, Config{WASI: true, Timeout: 500 * time.Millisecond, MaxOutput: 1 << 20})
+	fast.Warm(t.Context()) // compile first, so the limit times the handler, not the compiler
+	if r := get(t, tsFast.URL+"/app/hello.txt?loop"); r.status != 503 {
+		t.Errorf("?loop = %d, want 503", r.status)
 	}
 	if r := get(t, ts.URL+"/notwasm.txt"); r.status != 500 {
 		t.Errorf("non-wasm module: %d", r.status)
